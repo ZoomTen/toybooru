@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en-US"><head>
+    <meta charset="utf-8">
+    <title></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="../public/assets/screen.css" media="screen">
+</head><body>
+    <div id="pageContainer">
+        <header>
+            <nav id="mainMenu" class="headerBox">
+                <h1>Crapbooru</h1>
+                <form action="/list" method="get" class="inputAndSubmit">
+                    <input type="search" name="search" autocomplete="off" placeholder="find some_tags">
+                    <input type="submit" value="Find">
+                </form>
+                <ul class="hidden">
+                    <li><a href="#">Skip navigation</a></li>
+                    <li><a href="#">Skip to tags</a></li>
+                </ul>
+                <ul class="navLinks">
+                    <li><a href="#">Front page</a></li>
+                    <li><a href="#">Wiki</a></li>
+                </ul>
+            </nav>
+            <form class="headerBox" action="/upload" method="post" enctype="multipart/form-data">
+                <h2>Upload<br><small>(1&ndash;50 MB)</small></h2>
+                <input name="data" type="file">
+                <div class="textAreaAndSubmit">
+                    <textarea name="tags" placeholder="tag_me and_stuff yo"></textarea>
+                    <input type="submit" value="Post">
+                </div>
+            </form>
+            <nav class="headerBox">
+                <h2>Popular tags</h2>
+                <ul id="navTags" class="navLinks">
+                    <li>
+                        <a href="#" title="add to search">+</a>
+                        <a href="#" title="remove from search">-</a>
+                        <a href="#" title="boot up wiki page">?</a>
+                        <a href="#">lorem</a>
+                        (124)
+                    </li>
+                    <li>
+                        <a href="#" title="add to search">+</a>
+                        <a href="#" title="remove from search">-</a>
+                        <a href="#" title="boot up wiki page">?</a>
+                        <a href="#">ipsum</a>
+                        (100)
+                    </li>
+                    <li>
+                        <a href="#" title="add to search">+</a>
+                        <a href="#" title="remove from search">-</a>
+                        <a href="#" title="boot up wiki page">?</a>
+                        <a href="#">dolor_sit</a>
+                        (94)
+                    </li>
+                </ul>
+                <a href="#">View all tags</a>
+            </nav>
+        </header>
+        <main>
+            <section id="gallery">
+                <hr>
+                <ul class="galleryItems navLinks">
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/200/300" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/200/420" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/300/220" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/500/520" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/400/480" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                </ul>
+            </section>
+            <nav id="pageNav">
+                <h2 class="hidden">Pages</h2>
+                <ul class="navLinks">
+                    <li><a href="#">Prev</a></li>
+                    <li><a href="#">1</a></li>
+                    <li><a href="#">2</a></li>
+                    <li><a href="#">3</a></li>
+                    <li><a href="#">4</a></li>
+                    <li><a href="#">5</a></li>
+                    <li><a href="#">Next</a></li>
+                </ul>
+            </nav>
+        </main>
+    </div>
+    <footer>
+        <hr>
+        &copy; 2023 Zumi
+    </footer>
+</body></html>
