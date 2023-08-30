@@ -1,5 +1,7 @@
 # Toybooru
 
+![](preview.png)
+
 Exactly what it says on the tin: a toy booru-like web app.
 
 Has not been fuzzed yet and I'm not even sure the queries are secure yet—**do not use in production!**
