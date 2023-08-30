@@ -25,6 +25,7 @@ nimble cleanDb
 - (JS-only) Tag autocomplete, available on the following forms: Search, upload, edit.
 - "Namespaced" tags—really just decorated tags if there's a : separating the two parts. Decorations are applied with CSS. Predefined in `screen.css`: `author`, `character_owner`, `character`, `rating`.
 - Responsive layout
+- Rolling a random picture. Will also be limited to a subset of pictures provided you have an existing tag search query (GET parameter: `q`)
 - Utility for importing from [Hydrus Network](https://hydrusnetwork.github.io/hydrus/)… provided you've exported with tags to a corresponding text file.
 
 ## Todo
