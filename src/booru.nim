@@ -31,6 +31,10 @@ router mainRouter:
             siteContent=render.siteList(request.params),
             params=request.params,
             #tagsInSidebar=render.getImageTagsOfListSidebar(request.params)
+    get "/untagged":
+        resp render.masterTemplate(
+            siteContent=render.siteUntagged(request.params),
+            params=request.params
         )
     get "/random":
         if request.params.hasKey("q"):

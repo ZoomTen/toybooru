@@ -46,6 +46,8 @@ proc refreshTagCounts*() {.raises:[DbError].} =
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
 proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].} =
+    if tags.strip == "": return
+
     let db = open(dbFile, "", "", "")
     defer: db.close()
 

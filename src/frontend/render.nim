@@ -62,12 +62,13 @@ proc getPopularTagsSidebar(): VNode =
         # a(href="#"): text "View all tags"
 
 proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
+    let tags = images.getTagsFor img
     return buildHtml(nav):
-        h2: text "Tags in image"
-        ul(id="navTags", class="navLinks"):
-            for tagEntry in images.getTagsFor(img):
-                tagEntry.toTagDisplay(query)
-        # a(href="#"): text "View all tags"
+        if tags.len > 0:
+            h2: text "Tags in image"
+            ul(id="navTags", class="navLinks"):
+                for tagEntry in tags:
+                    tagEntry.toTagDisplay(query)
 
 proc getImageTagsOfListSidebar*(params: Table): VNode =
     let
@@ -111,7 +112,7 @@ proc relatedContent(query: string = ""): VNode =
                 li: a(href="/random"): text "Random pic"
             else:
                 li: a(href="/random?q="&query): text "Random pic from this query"
-            li: a(href="/untagged"): text "View untagged entries"
+            li: a(href="/untagged"): text "View untagged posts"
 
 proc siteHeader(query: string = ""): VNode =
     return buildHtml(header):
@@ -221,6 +222,35 @@ proc siteList*(params: Table): VNode =
                 if imageList.len >= 1:
                     getImageTagsOfListSidebar(params)
                     relatedContent(query)
+
+proc siteUntagged*(params: Table): VNode =
+    let
+        paramTuple = params.getVarsFromParams
+        query = ""
+        pageNum = paramTuple.pageNum
+        numResults = paramTuple.numResults
+        imgSqlQuery = "Select * From images Where id Not In (Select image_id From image_tags)"
+        numPages = ceilDiv(
+            images.getCountOfQuery(imgSqlQuery),
+            numResults
+        )
+        imageList = images.getQueried(
+            images.buildPageQuery(
+                imgSqlQuery,
+                pageNum=pageNum, numResults=numResults,
+                descending=true
+            )
+        )
+
+    return buildHtml(main):
+        tdiv(class="contentWithTags"):
+            section(id="gallery"):
+                h2: text "Untagged Posts"
+                if imageList.len < 1:
+                    span: text "No untagged posts :)"
+                else:
+                    imageList.buildGallery(query)
+                    numPages.buildGalleryPagination(pageNum, query)
 
 proc siteEntry*(img: ImageEntryRef, query: string): VNode =
     let
