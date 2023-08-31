@@ -161,8 +161,15 @@ main h2:first-of-type {
 	padding: 0 0.5em;
 }
 
-#navTags {
-	list-style: none;
+#allTags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1em;
+	font-size: 1.25em;
+}
+
+#allTags li {
+	margin: 0;
 }
 
 #mainMenu {

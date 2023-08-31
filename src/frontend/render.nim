@@ -69,6 +69,7 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
             ul(id="navTags", class="navLinks"):
                 for tagEntry in tags:
                     tagEntry.toTagDisplay(query)
+        a(href="/taglist"): text "View all tags"
 
 proc getImageTagsOfListSidebar*(params: Table): VNode =
     let
@@ -311,6 +312,16 @@ proc siteWiki*(): VNode =
             h2: text "Wiki"
             # TODO: markdown and RST conversion here
             p: text "Not available yet!"
+
+proc siteAllTags*(params: Table): VNode =
+    let (query, pageNum, numResults) = params.getVarsFromParams
+    let tags = images.getAllTags()
+    return buildHtml(main):
+        section(id="wiki"):
+            h2: text "All tags"
+            ul(id="allTags", class="navLinks"):
+                for tagEntry in tags:
+                    tagEntry.toTagDisplay(query)
 
 proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): string =
     let (query, pageNum, numResults) = params.getVarsFromParams

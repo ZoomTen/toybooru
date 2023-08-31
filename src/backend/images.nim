@@ -156,6 +156,17 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple] =
             (tag: row[0], count: row[1].parseInt)
         )
 
+proc getAllTags*(): seq[TagTuple] =
+    let db = open(dbFile, "", "", "")
+    defer: db.close()
+
+    result = @[]
+
+    for row in db.instantRows(sql"Select tag, count From tags Order By tag Asc"):
+        result.add(
+            (tag: row[0], count: row[1].parseInt)
+        )
+
 proc tagsAsString*(tags: seq[TagTuple]): string =
     var st: seq[string]
     for tag in tags:

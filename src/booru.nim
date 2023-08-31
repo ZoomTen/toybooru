@@ -29,11 +29,16 @@ router mainRouter:
     get "/list":
         resp render.masterTemplate(
             siteContent=render.siteList(request.params),
-            params=request.params,
-            #tagsInSidebar=render.getImageTagsOfListSidebar(request.params)
+            params=request.params
+        )
     get "/untagged":
         resp render.masterTemplate(
             siteContent=render.siteUntagged(request.params),
+            params=request.params
+        )
+    get "/taglist":
+        resp render.masterTemplate(
+            siteContent=render.siteAllTags(request.params),
             params=request.params
         )
     get "/random":
