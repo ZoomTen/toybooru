@@ -175,8 +175,19 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
 
     imageId.int.assignTags(tags)
 
-proc deleteImage*(imageId: int) {.raises:[DbError].} =
+proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyError].} =
     let db = open(dbFile, "", "", "")
     defer: db.close()
-    db.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
-    db.exec(sql"Delete From images Where id = ?", $imageId)
+    let row = db.getRow(sql"Select hash, format From images Where id = ?", $imageId)
+    if row != @[]:
+        # delete the file first
+        let
+            hash = row[0]
+            extension = mimeMappings[row[1]]
+        removeFile(imgDir & "/" & hash & "." & extension) # exportName
+        removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
+        # then delete it from the db
+        db.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
+        db.exec(sql"Delete From images Where id = ?", $imageId)
+    else:
+        raise newException(BooruException, "Invalid image")
