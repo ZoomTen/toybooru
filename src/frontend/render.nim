@@ -25,6 +25,17 @@ proc genericMakeTagText(tagGet: TagTuple): VNode =
 proc compareTags(a, b: TagTuple): int =
     cmp(a.tag, b.tag)
 
+proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode =
+    let q = query.strip
+    return buildHtml(li):
+        a(href="/list?q="&q&"+"&tagEntry.tag, title="add to search"): text "+"
+        text " "
+        a(href="/list?q="&q&"+-"&tagEntry.tag, title="exclude from search"): text "-"
+        text " "
+        a(href="/wiki/$#" % tagEntry.tag, title="boot up wiki page"): text "?"
+        text " "
+        genericMakeTagText tagEntry
+
 proc getPopularTagsSidebar(): VNode =
     var popularTags = images.getMostPopularTagsGeneral(25)
     popularTags.sort(compareTags)
@@ -32,29 +43,15 @@ proc getPopularTagsSidebar(): VNode =
         h2: text "Popular tags"
         ul(id="navTags", class="navLinks"):
             for tagEntry in popularTags:
-                li:
-                    # a(href="#", title="add to search"): text "+"
-                    # text " "
-                    # a(href="#", title="remove from search"): text "-"
-                    # text " "
-                    a(href="/wiki/$#" % tagEntry.tag, title="boot up wiki page"): text "?"
-                    text " "
-                    genericMakeTagText tagEntry
+                tagEntry.toTagDisplay
         # a(href="#"): text "View all tags"
 
-proc getImageTagsSidebar*(img: ImageEntryRef): VNode =
+proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
     return buildHtml(nav):
         h2: text "Tags in image"
         ul(id="navTags", class="navLinks"):
             for tagEntry in images.getTagsFor(img):
-                li:
-                    # a(href="#", title="add to search"): text "+"
-                    # text " "
-                    # a(href="#", title="remove from search"): text "-"
-                    # text " "
-                    a(href="/wiki/$#" % tagEntry.tag, title="boot up wiki page"): text "?"
-                    text " "
-                    genericMakeTagText tagEntry
+                tagEntry.toTagDisplay(query)
         # a(href="#"): text "View all tags"
 
 proc getImageTagsOfListSidebar*(params: Table): VNode =
@@ -70,7 +67,7 @@ proc getImageTagsOfListSidebar*(params: Table): VNode =
 
     let numPages = ceilDiv(
         images.getCountOfQuery(
-            images.buildSearchQuery(params.getOrDefault "q")
+            images.buildSearchQuery(query)
         ),
         numResults
     )
@@ -95,15 +92,17 @@ proc getImageTagsOfListSidebar*(params: Table): VNode =
         h2: text "Tags for images in list"
         ul(id="navTags", class="navLinks"):
             for tagEntry in totalTags:
-                li:
-                    # a(href="#", title="add to search"): text "+"
-                    # text " "
-                    # a(href="#", title="remove from search"): text "-"
-                    # text " "
-                    a(href="/wiki/$#" % tagEntry.tag, title="boot up wiki page"): text "?"
-                    text " "
-                    genericMakeTagText tagEntry
+                tagEntry.toTagDisplay(query)
         # a(href="#"): text "View all tags"
+
+proc relatedContent(query: string = ""): VNode =
+    return buildHtml(aside):
+        h2: text "Related"
+        ul(class="navLinks", id="galleryLinks"):
+            if query.strip == "":
+                li: a(href="/random"): text "Random pic"
+            else:
+                li: a(href="/random?q="&query): text "Random pic from this query"
 
 proc siteHeader(query: string = ""): VNode =
     return buildHtml(header):
@@ -122,15 +121,27 @@ proc siteHeader(query: string = ""): VNode =
                 li:
                     a(href="/"): text "Front page"
                 li:
-                    if query == "":
-                        a(href="/random"): text "Random pic"
-                    else:
-                        a(href="/random?q=" & query): text "Random pic"
-                li:
                     a(href="/wiki"): text "Wiki"
 
+proc uploadForm(): VNode =
+    return buildHtml(
+        form(class="formBox",
+             action="/upload",
+             `method`="post",
+             enctype="multipart/form-data")
+        ):
+            h2:
+                text "Upload"
+            input(name="data", type="file")
+            tdiv(class="textAreaAndSubmit"):
+                textarea(name="tags",
+                         placeholder="tag_me and_stuff yo",
+                         id="submitTagBox"
+                )
+                input(type="submit")
+
 proc siteList*(params: Table): VNode =
-    let query = params.getOrDefault("q")
+    let query = params.getOrDefault("q").strip
 
     let pageNum = try:
             params.getOrDefault("page", "0").parseInt
@@ -142,7 +153,7 @@ proc siteList*(params: Table): VNode =
 
     let numPages = ceilDiv(
         images.getCountOfQuery(
-            images.buildSearchQuery(params.getOrDefault "q")
+            images.buildSearchQuery(query)
         ),
         numResults
     )
@@ -159,34 +170,38 @@ proc siteList*(params: Table): VNode =
         tdiv(class="contentWithTags"):
             section(id="gallery"):
                 h2: text "Posts"
-                if imageList.len > 0:
+                if imageList.len < 1:
+                    span: text "Nothing here!"
+                else:
                     ul(class="galleryItems navLinks"):
                         for img in imageList:
                             li:
-                                a(href="/entry/" & $img.id): img(
+                                a(href="/entry/" & $img.id & "?q="&query): img(
                                     src="/thumbs/" & img.hash & ".jpg",
                                     title=images.tagsAsString(
                                         images.getTagsFor(img)
                                     )
                                 )
-                else:
-                    span: text "Nothing here!"
-                if imageList.len > 0:
                     nav(id="pageNav"):
                         h2(class="hidden"): text "Pages"
                         ul(class="navLinks"):
+                            # prev/first
                             if pageNum == 0:
                                 li(aria-label="First"): text "<<"
                                 li(aria-label="Prev"): text "<"
                             else:
                                 li: a(aria-label="First", href="?page=0&q=" & query): text "<<"
                                 li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & "&q=" & query): text "<"
+
+                            # page numbers, show 2 pages around current page
                             for i in 0..<numPages:
                                 if i in pageNum-2..pageNum+2:
                                     if i == pageNum:
                                         li: text $(i+1)
                                     else:
                                         li: a(href="?page=" & $i & "&q=" & query): text $(i+1)
+
+                            # next/last
                             if pageNum == numPages-1:
                                 li(aria-label="Next"): text ">"
                                 li(aria-label="Last"): text ">>"
@@ -194,16 +209,12 @@ proc siteList*(params: Table): VNode =
                                 li: a(aria-label="Next", href="?page=" & $(pageNum+1) & "&q=" & query): text ">"
                                 li: a(aria-label="Last", href="?page=" & $(numPages-1) & "&q=" & query): text ">>"
             section(id="tags"):
-                form(class="formBox", action="/upload", `method`="post", enctype="multipart/form-data"):
-                    h2:
-                        text "Upload"
-                    input(name="data", type="file")
-                    tdiv(class="textAreaAndSubmit"):
-                        textarea(name="tags", placeholder="tag_me and_stuff yo", id="submitTagBox")
-                        input(type="submit")
-                getImageTagsOfListSidebar(params)
+                uploadForm()
+                if imageList.len >= 1:
+                    getImageTagsOfListSidebar(params)
+                    relatedContent(query)
 
-proc siteEntry*(img: ImageEntryRef): VNode =
+proc siteEntry*(img: ImageEntryRef, query: string): VNode =
     return buildHtml(main):
         # nav(id="pageNav"):
         #     ul(class="navLinks"):
@@ -238,7 +249,8 @@ proc siteEntry*(img: ImageEntryRef): VNode =
                                 li: a(href="/entry/$#/edit" % $img.id): text "Edit"
                                 li: a(href="/entry/$#/delete" % $img.id): text "Delete"
             section(id="tags"):
-                getImageTagsSidebar(img)
+                getImageTagsSidebar(img, query)
+                relatedContent(query)
 
 proc siteEntryEdit*(img: ImageEntryRef): VNode =
     return buildHtml(main):
@@ -265,25 +277,25 @@ proc siteWiki*(): VNode =
             p: text "Not available yet!"
 
 proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): string =
-    let vn = buildHtml(html):
-        head:
-            meta(charset="utf-8")
-            title: text(if title.strip == "":
-                    siteName
-                else:
-                    title & " - " & siteName
-            )
-            meta(name="viewport", content="width=device-width,initial-scale=1")
-            link(rel="stylesheet", href="/assets/screen.css")
-        body:
-            tdiv(id="pageContainer"):
-                siteHeader(
-                    params.getOrDefault("q").strip
+    let
+        query = params.getOrDefault("q").strip
+        vn = buildHtml(html):
+            head:
+                meta(charset="utf-8")
+                title: text(if title.strip == "":
+                        siteName
+                    else:
+                        title & " - " & siteName
                 )
-                siteContent
-            footer:
-                text "© 2023 Zumi"
-            script(src="/assets/autocomplete.js")
+                meta(name="viewport", content="width=device-width,initial-scale=1")
+                link(rel="stylesheet", href="/assets/screen.css")
+            body:
+                tdiv(id="pageContainer"):
+                    siteHeader(query)
+                    siteContent
+                footer:
+                    text "© 2023 Zumi"
+                script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 
 proc exception*(exception: ref Exception): VNode =

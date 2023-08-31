@@ -50,9 +50,8 @@ router mainRouter:
         except:
             resp Http404
         resp render.masterTemplate(
-            siteContent=render.siteEntry(img),
-            params=request.params,
-            #tagsInSidebar=render.getImageTagsSidebar(img)
+            siteContent=render.siteEntry(img, query=request.params.getOrDefault("q")),
+            params=request.params
         )
     get "/entry/@id/edit":
         var img: ImageEntryRef
