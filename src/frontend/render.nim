@@ -215,6 +215,9 @@ proc siteList*(params: Table): VNode =
                     relatedContent(query)
 
 proc siteEntry*(img: ImageEntryRef, query: string): VNode =
+    let
+        ext = mimeMappings[img.formatMime]
+        imgLink = "/images/" & img.hash & "." & ext
     return buildHtml(main):
         # nav(id="pageNav"):
         #     ul(class="navLinks"):
@@ -228,12 +231,17 @@ proc siteEntry*(img: ImageEntryRef, query: string): VNode =
         #             li: a(href="#"): text "Next"
         tdiv(class="contentWithTags"):
             section(id="image"):
-                img(
-                    src="/images/" & img.hash & "." & mimeMappings[img.formatMime],
-                    title=images.tagsAsString(
-                        images.getTagsFor(img)
+                if ext in ["mp4"]:
+                    video(controls="1"):
+                        source(src=imgLink, type=img.formatMime)
+                        a(href=imgLink): text "View video"
+                else:
+                    img(
+                        src=imgLink,
+                        title=images.tagsAsString(
+                            images.getTagsFor(img)
+                        )
                     )
-                )
                 dl(id="imageInfo"):
                     # tdiv:
                     #     dt: text "Uploader"

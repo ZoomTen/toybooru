@@ -5,7 +5,7 @@ import ../stb/resize as stbz
 import ../settings
 import ./exceptions
 
-import std/[md5, tables, strutils]
+import std/[md5, tables, strutils, os, osproc]
 
 # db stuff, change for 2.0.0
 import std/db_sqlite
@@ -81,8 +81,15 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
 
     refreshTagCounts()
 
+proc genThumbSize(width, height: int): array[0..1, int] =
+    result = [thumbSize, thumbSize]
+    if width/height > 1.0: # if wide
+        result[1] = int(thumbSize.float * (height/width))
+    else: # if tall
+        result[0] = int(thumbSize.float * (width/height))
+
 proc processFile*(file: FileUploadRef, tags: string) {.raises:[
-    BooruException, STBIException, IOError
+    BooruException, STBIException, IOError, OSError, Exception
 ].} =
     let db = open(dbFile, "", "", "")
 
@@ -105,31 +112,54 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
             height = 0
 
         block saveImageAndThumbnail:
+            let
+                exportName = imgDir & "/" & hash & "." & extension
+                thumbName = thumbDir & "/" & hash & ".jpg"
             # copy uploaded file
             writeFile(
-                imgDir & "/" & hash & "." & extension,
+                exportName,
                 file.contents
             )
             # make thumbnail
-            var
-                channels: int
-                imgData, imgThumb: seq[uint8]
+            if extension in ["mp4"]:
+                let
+                    ffprobe = findExe("ffprobe")
+                    ffmpeg = findExe("ffmpeg")
+                if ffprobe == "" or ffmpeg == "":
+                    raise newException(BooruException, "This server doesn't support video files :(")
+                # https://stackoverflow.com/a/29585066
+                var (wh, ex) = execCmdEx(
+                    ffprobe & " -v quiet -select_streams v -show_entries stream=width,height -of csv=p=0:s=x " & exportName
+                )
+                if ex != 0:
+                    raise newException(BooruException, "Error processing video!")
+                let
+                    whx = wh.split("x")
+                    width = whx[0].strip.parseInt
+                    height = whx[1].strip.parseInt
+                    genThumbSize = genThumbSize(width, height)
 
-            imgData = stbr.loadFromMemory(
-                cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
-            )
+                (wh, ex) = execCmdEx(
+                    ffmpeg & " -i " & exportName & " -ss 0 -vframes 1 -s " &
+                    $genThumbSize[0] & "x" & $genThumbSize[1] & " -y " & thumbName
+                )
 
-            # calculate thumbsize
-            var genThumbSize = [thumbSize, thumbSize]
-            if width/height > 1.0: # if wide
-                genThumbSize[1] = int(thumbSize.float * (height/width))
-            else: # if tall
-                genThumbSize[0] = int(thumbSize.float * (width/height))
+            else:
+                var
+                    channels: int
+                    imgData, imgThumb: seq[uint8]
 
-            imgThumb = stbz.resize(
-                imgData, width, height, genThumbSize[0], genThumbSize[1], channels
-            )
-            stbw.writeJPG(thumbDir & "/" & hash & ".jpg", genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
+                imgData = stbr.loadFromMemory(
+                    cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
+                )
+
+                # calculate thumbsize
+                let genThumbSize = genThumbSize(width, height)
+
+                imgThumb = stbz.resize(
+                    imgData, width, height, genThumbSize[0], genThumbSize[1], channels
+                )
+                stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
 
         # add new image
         imageId = db.tryInsertID(sql"""
