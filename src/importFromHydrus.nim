@@ -1,3 +1,4 @@
+import ./backend/setup as setup
 import ./backend/upload as upload
 import std/[
     os, mimetypes, strutils, sugar
@@ -7,6 +8,8 @@ when isMainModule:
     let mimes = newMimetypes()
     if args.len == 1:
         if dirExists(args[0]):
+            setup.folders()
+            setup.database()
             for file in walkDir(args[0]):
                 var (dir, name, ext) = splitFile(file.path)
 
