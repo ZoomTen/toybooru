@@ -34,10 +34,11 @@ router mainRouter:
         )
     get "/random":
         if request.params.hasKey("q"):
+            let paramized = render.getVarsFromParams(request.params)
             let randomImgId = images.getRandomIdFrom(
-                images.buildSearchQuery(request.params["q"])
+                images.buildSearchQuery(paramized.query)
             )
-            redirect "/entry/" & $randomImgId & "?q=" & request.params["q"]
+            redirect "/entry/" & $randomImgId & "?q=" & paramized.query
         else:
             let randomImgId = images.getRandomIdFrom("Select id From images")
             redirect "/entry/" & $randomImgId
@@ -50,7 +51,9 @@ router mainRouter:
         except:
             resp Http404
         resp render.masterTemplate(
-            siteContent=render.siteEntry(img, query=request.params.getOrDefault("q")),
+            siteContent=render.siteEntry(img,
+                query=render.getVarsFromParams(request.params).query
+            ),
             params=request.params
         )
     get "/entry/@id/edit":
@@ -89,9 +92,6 @@ router mainRouter:
             raise newException(BooruException, "No image sent?")
 
         let rawTags = request.formData["tags"].body
-
-        if rawTags.strip == "":
-            raise newException(BooruException, "Tags are blank!")
 
         upload.processFile(
             upload.fileFromReq(request.formData["data"]),

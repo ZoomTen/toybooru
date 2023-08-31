@@ -10,6 +10,21 @@ import ../settings
 
 import std/db_sqlite
 
+type
+    PageVars* = tuple
+        query: string
+        pageNum: int
+        numResults: int
+
+proc getVarsFromParams*(params: Table): PageVars =
+    result.query = params.getOrDefault("q").strip
+    result.pageNum = try:
+            params.getOrDefault("page", "0").parseInt
+        except ValueError: 0
+    result.numResults = try:
+            params.getOrDefault("count", $defaultNumResults).parseInt
+        except ValueError: defaultNumResults
+
 proc genericMakeTagText(tagGet: TagTuple): VNode =
     let isNamespaced = tagGet.tag.find(":")
     if isNamespaced == -1:
@@ -55,30 +70,23 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
         # a(href="#"): text "View all tags"
 
 proc getImageTagsOfListSidebar*(params: Table): VNode =
-    let query = params.getOrDefault("q")
-
-    let pageNum = try:
-            params.getOrDefault("page", "0").parseInt
-        except ValueError: 0
-
-    let numResults = try:
-            params.getOrDefault("count", $defaultNumResults).parseInt
-        except ValueError: defaultNumResults
-
-    let numPages = ceilDiv(
-        images.getCountOfQuery(
-            images.buildSearchQuery(query)
-        ),
-        numResults
-    )
-
-    let imageList = images.getQueried(
-        images.buildPageQuery(
-            images.buildSearchQuery(query),
-            pageNum=pageNum, numResults=numResults,
-            descending=true
+    let
+        paramTuple = params.getVarsFromParams
+        query = paramTuple.query
+        pageNum = paramTuple.pageNum
+        numResults = paramTuple.numResults
+        imgSqlQuery = images.buildSearchQuery(query)
+        numPages = ceilDiv(
+            images.getCountOfQuery(imgSqlQuery),
+            numResults
         )
-    )
+        imageList = images.getQueried(
+            images.buildPageQuery(
+                imgSqlQuery,
+                pageNum=pageNum, numResults=numResults,
+                descending=true
+            )
+        )
 
     var totalTags: seq[TagTuple] = @[]
 
@@ -103,6 +111,7 @@ proc relatedContent(query: string = ""): VNode =
                 li: a(href="/random"): text "Random pic"
             else:
                 li: a(href="/random?q="&query): text "Random pic from this query"
+            li: a(href="/untagged"): text "View untagged entries"
 
 proc siteHeader(query: string = ""): VNode =
     return buildHtml(header):
@@ -140,31 +149,63 @@ proc uploadForm(): VNode =
                 )
                 input(type="submit")
 
+proc buildGalleryPagination(numPages, pageNum: int, query: string): VNode =
+    return buildHtml(nav(id="pageNav")):
+        h2(class="hidden"): text "Pages"
+        ul(class="navLinks"):
+            # prev/first
+            if pageNum == 0:
+                li(aria-label="First"): text "<<"
+                li(aria-label="Prev"): text "<"
+            else:
+                li: a(aria-label="First", href="?page=0&q=" & query): text "<<"
+                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & "&q=" & query): text "<"
+
+            # page numbers, show 2 pages around current page
+            for i in 0..<numPages:
+                if i in pageNum-2..pageNum+2:
+                    if i == pageNum:
+                        li: text $(i+1)
+                    else:
+                        li: a(href="?page=" & $i & "&q=" & query): text $(i+1)
+
+            # next/last
+            if pageNum == numPages-1:
+                li(aria-label="Next"): text ">"
+                li(aria-label="Last"): text ">>"
+            else:
+                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & "&q=" & query): text ">"
+                li: a(aria-label="Last", href="?page=" & $(numPages-1) & "&q=" & query): text ">>"
+
+proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode =
+    return buildHtml(ul(class="galleryItems navLinks")):
+        for img in imageList:
+            li:
+                a(href="/entry/" & $img.id & "?q="&query): img(
+                        src="/thumbs/" & img.hash & ".jpg",
+                        title=images.tagsAsString(
+                            images.getTagsFor(img)
+                        )
+                    )
+
 proc siteList*(params: Table): VNode =
-    let query = params.getOrDefault("q").strip
-
-    let pageNum = try:
-            params.getOrDefault("page", "0").parseInt
-        except ValueError: 0
-
-    let numResults = try:
-            params.getOrDefault("count", $defaultNumResults).parseInt
-        except ValueError: defaultNumResults
-
-    let numPages = ceilDiv(
-        images.getCountOfQuery(
-            images.buildSearchQuery(query)
-        ),
-        numResults
-    )
-
-    let imageList = images.getQueried(
-        images.buildPageQuery(
-            images.buildSearchQuery(query),
-            pageNum=pageNum, numResults=numResults,
-            descending=true
+    let
+        paramTuple = params.getVarsFromParams
+        query = paramTuple.query
+        pageNum = paramTuple.pageNum
+        numResults = paramTuple.numResults
+        imgSqlQuery = images.buildSearchQuery(query)
+        numPages = ceilDiv(
+            images.getCountOfQuery(imgSqlQuery),
+            numResults
         )
-    )
+        imageList = images.getQueried(
+            images.buildPageQuery(
+                imgSqlQuery,
+                pageNum=pageNum, numResults=numResults,
+                descending=true
+            )
+        )
 
     return buildHtml(main):
         tdiv(class="contentWithTags"):
@@ -173,41 +214,8 @@ proc siteList*(params: Table): VNode =
                 if imageList.len < 1:
                     span: text "Nothing here!"
                 else:
-                    ul(class="galleryItems navLinks"):
-                        for img in imageList:
-                            li:
-                                a(href="/entry/" & $img.id & "?q="&query): img(
-                                    src="/thumbs/" & img.hash & ".jpg",
-                                    title=images.tagsAsString(
-                                        images.getTagsFor(img)
-                                    )
-                                )
-                    nav(id="pageNav"):
-                        h2(class="hidden"): text "Pages"
-                        ul(class="navLinks"):
-                            # prev/first
-                            if pageNum == 0:
-                                li(aria-label="First"): text "<<"
-                                li(aria-label="Prev"): text "<"
-                            else:
-                                li: a(aria-label="First", href="?page=0&q=" & query): text "<<"
-                                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & "&q=" & query): text "<"
-
-                            # page numbers, show 2 pages around current page
-                            for i in 0..<numPages:
-                                if i in pageNum-2..pageNum+2:
-                                    if i == pageNum:
-                                        li: text $(i+1)
-                                    else:
-                                        li: a(href="?page=" & $i & "&q=" & query): text $(i+1)
-
-                            # next/last
-                            if pageNum == numPages-1:
-                                li(aria-label="Next"): text ">"
-                                li(aria-label="Last"): text ">>"
-                            else:
-                                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & "&q=" & query): text ">"
-                                li: a(aria-label="Last", href="?page=" & $(numPages-1) & "&q=" & query): text ">>"
+                    imageList.buildGallery(query)
+                    numPages.buildGalleryPagination(pageNum, query)
             section(id="tags"):
                 uploadForm()
                 if imageList.len >= 1:
@@ -219,16 +227,6 @@ proc siteEntry*(img: ImageEntryRef, query: string): VNode =
         ext = mimeMappings[img.formatMime]
         imgLink = "/images/" & img.hash & "." & ext
     return buildHtml(main):
-        # nav(id="pageNav"):
-        #     ul(class="navLinks"):
-        #         if params.hasKey("q"):
-        #             li: a(href="#"): text "Previous"
-        #             li: a(href="#"): text "Index"
-        #             li: a(href="#"): text "Next"
-        #         else:
-        #             li: a(href="#"): text "Previous"
-        #             li: a(href="#"): text "Index"
-        #             li: a(href="#"): text "Next"
         tdiv(class="contentWithTags"):
             section(id="image"):
                 if ext in ["mp4"]:
@@ -285,8 +283,8 @@ proc siteWiki*(): VNode =
             p: text "Not available yet!"
 
 proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): string =
+    let (query, pageNum, numResults) = params.getVarsFromParams
     let
-        query = params.getOrDefault("q").strip
         vn = buildHtml(html):
             head:
                 meta(charset="utf-8")
