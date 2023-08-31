@@ -1,12 +1,12 @@
 # This is an ad-hoc implementation
 
-import components
+import stb_image/components
 export components.Y
 export components.YA
 export components.RGB
 export components.RGBA
 
-from read import STBIException
+from stb_image/read import STBIException
 
 when defined(windows) and defined(vcc):
   {.pragma: stbcall, stdcall.}
@@ -14,7 +14,7 @@ else:
   {.pragma: stbcall, cdecl.}
 
 # Include the header
-{.compile: "stb_image/resize.c".}
+{.compile: "resize.c".}
 
 when defined(Posix) and not defined(haiku):
   {.passl: "-lm".}

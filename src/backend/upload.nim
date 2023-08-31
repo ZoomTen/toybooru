@@ -1,6 +1,6 @@
 import jester
-import ../stb/read as stbr
-import ../stb/write as stbw
+import stb_image/read as stbr
+import stb_image/write as stbw
 import ../stb/resize as stbz
 import ../settings
 import ./exceptions

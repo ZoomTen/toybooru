@@ -16,7 +16,8 @@ requires "nim 1.6.14..<2.0.0"
 
 requires [
     "jester#185c610",
-    "karax#2371ea3"
+    "karax#2371ea3",
+    "stbimage#ba5f4528"
 ]
 
 # Debug dependencies
