@@ -151,7 +151,12 @@ proc uploadForm(): VNode =
                 )
                 input(type="submit")
 
-proc buildGalleryPagination(numPages, pageNum: int, query: string): VNode =
+proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): VNode =
+    let appendParam = if numResults != defaultNumResults:
+            "&count=" & $numResults & "&q="
+        else:
+            "&q="
+
     return buildHtml(nav(id="pageNav")):
         h2(class="hidden"): text "Pages"
         ul(class="navLinks"):
@@ -160,8 +165,8 @@ proc buildGalleryPagination(numPages, pageNum: int, query: string): VNode =
                 li(aria-label="First"): text "<<"
                 li(aria-label="Prev"): text "<"
             else:
-                li: a(aria-label="First", href="?page=0&q=" & query): text "<<"
-                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & "&q=" & query): text "<"
+                li: a(aria-label="First", href="?page=0" & appendParam & query): text "<<"
+                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & appendParam & query): text "<"
 
             # page numbers, show 2 pages around current page
             for i in 0..<numPages:
@@ -169,15 +174,15 @@ proc buildGalleryPagination(numPages, pageNum: int, query: string): VNode =
                     if i == pageNum:
                         li: text $(i+1)
                     else:
-                        li: a(href="?page=" & $i & "&q=" & query): text $(i+1)
+                        li: a(href="?page=" & $i & appendParam & query): text $(i+1)
 
             # next/last
             if pageNum == numPages-1:
                 li(aria-label="Next"): text ">"
                 li(aria-label="Last"): text ">>"
             else:
-                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & "&q=" & query): text ">"
-                li: a(aria-label="Last", href="?page=" & $(numPages-1) & "&q=" & query): text ">>"
+                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & query): text ">"
+                li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & query): text ">>"
 
 proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode =
     return buildHtml(ul(class="galleryItems navLinks")):
@@ -217,7 +222,7 @@ proc siteList*(params: Table): VNode =
                     span: text "Nothing here!"
                 else:
                     imageList.buildGallery(query)
-                    numPages.buildGalleryPagination(pageNum, query)
+                    numPages.buildGalleryPagination(pageNum, numResults, query)
             section(id="tags"):
                 uploadForm()
                 if imageList.len >= 1:
@@ -251,7 +256,7 @@ proc siteUntagged*(params: Table): VNode =
                     span: text "No untagged posts :)"
                 else:
                     imageList.buildGallery(query)
-                    numPages.buildGalleryPagination(pageNum, query)
+                    numPages.buildGalleryPagination(pageNum, numResults, query)
 
 proc siteEntry*(img: ImageEntryRef, query: string): VNode =
     let
