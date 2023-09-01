@@ -103,7 +103,7 @@ proc getImageTagsOfListSidebar*(params: Table): VNode =
         ul(id="navTags", class="navLinks"):
             for tagEntry in totalTags:
                 tagEntry.toTagDisplay(query)
-        # a(href="#"): text "View all tags"
+        a(href="/taglist"): text "View all tags"
 
 proc relatedContent(query: string = ""): VNode =
     return buildHtml(aside):
