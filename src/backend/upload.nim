@@ -5,7 +5,7 @@ import ../stb/resize as stbz
 import ../settings
 import ./exceptions
 
-import std/[md5, tables, strutils, os, osproc]
+import std/[md5, tables, strutils, os, osproc, sequtils]
 
 # db stuff, change for 2.0.0
 import std/db_sqlite
@@ -55,7 +55,8 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
     if db.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
         raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
 
-    for tag in tags.strip.split(" "):
+    for tag in tags.strip.split(" ").deduplicate():
+        if tag == "": continue
         if tag[0] == '-':
             raise newException(BooruException, "Tag " & tag & " cannot start with a minus!")
 
