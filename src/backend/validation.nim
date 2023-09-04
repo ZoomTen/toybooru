@@ -21,7 +21,7 @@ const
         ([a-z_]+:)?      # can have a category, limited charset
         [a-z0_9<>!\(\)]+ # supported characters
     """
-proc normalizeSpaces(s: string): string {.raises: [ValueError].} =
+proc normalizeSpaces*(s: string): string {.raises: [ValueError].} =
     return s.replace(re2"\s+", " ")
 
 proc sanitizeQuery*(s: string): string {.raises: [ValueError].} =
@@ -33,5 +33,5 @@ proc sanitizeQuery*(s: string): string {.raises: [ValueError].} =
 proc sanitizeKeyword*(s: string): string {.raises: [ValidationError].} =
     result = s.strip()
     if not match(result, KeywordSyntax):
-        raise newException(ValidationError, "Invalid keyword!")
+        raise newException(ValidationError, "Invalid keyword: " & s)
     return result

@@ -4,6 +4,7 @@ import stb_image/write as stbw
 import ../stb/resize as stbz
 import ../settings
 import ./exceptions
+import ./validation as validate
 
 import std/[md5, tables, strutils, os, osproc, sequtils]
 
@@ -45,8 +46,15 @@ proc refreshTagCounts*() {.raises:[DbError].} =
     for row in db.instantRows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
-proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].} =
-    if tags.strip() == "": return
+proc assignTags*(imageId: int, t: string) {.raises:[DbError, BooruException].} =
+    var tags = ""
+
+    try:
+        tags = validate.normalizeSpaces(t.strip())
+    except ValueError:
+        return
+
+    if tags == "": return
 
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -55,10 +63,17 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
     if db.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
         raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
 
-    for tag in tags.strip().split(" ").deduplicate():
-        if tag == "": continue
-        if tag[0] == '-':
-            raise newException(BooruException, "Tag " & tag & " cannot start with a minus!")
+    var tag = ""
+
+    for rawTag in tags.split(" ").deduplicate():
+        if rawTag == "": continue
+        if rawTag[0] == '-':
+            raise newException(BooruException, "Tag " & rawTag & " cannot start with a minus!")
+
+        try:
+            tag = sanitizeKeyword(rawTag)
+        except ValidationError as e:
+            raise newException(BooruException, e.msg)
 
         var tagRowId: int64
         try: # does tag exist?
@@ -71,11 +86,6 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
             """, tag.strip())
             if tagRowId == -1:
                 raise newException(BooruException, "Failed inserting tag " & tag & " into db!")
-        # increment count
-        # db.exec(
-        #     sql"""Update tags Set count = count + 1 Where id = ?""",
-        #     tagRowId
-        # )
 
         # add tag to image
         db.exec(sql"""
@@ -104,7 +114,7 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     try:
         extension = mimeMappings[file.mime]
     except KeyError:
-        raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png.")
+        raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png, mp4.")
 
     let hashExists = db.getValue(sql"Select id From images Where hash = ?", hash)
     if hashExists != "":
