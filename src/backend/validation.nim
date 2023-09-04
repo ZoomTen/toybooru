@@ -19,7 +19,7 @@ const
     """
     KeywordSyntax = re2"""(?x)
         ([a-z_]+:)?      # can have a category, limited charset
-        [a-z0_9<>!\(\)]+ # supported characters
+        [a-z0-9_<>!\(\)]+ # supported characters
     """
 proc normalizeSpaces*(s: string): string {.raises: [ValueError].} =
     return s.replace(re2"\s+", " ")
