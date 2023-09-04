@@ -6,6 +6,7 @@ import std/[
     strutils, math, sequtils, algorithm
 ]
 import ../backend/images as images
+import ../backend/validation as validate
 import ../settings
 
 import std/db_sqlite
@@ -14,12 +15,12 @@ import std/db_sqlite
 
 type
     PageVars* = tuple
-        query: string
+        query: string   # contains raw query!
         pageNum: int
         numResults: int
 
 proc getVarsFromParams*(params: Table): PageVars =
-    result.query = params.getOrDefault("q").strip()
+    result.query = params.getOrDefault("q")
     result.pageNum = try:
             params.getOrDefault("page", "0").parseInt()
         except ValueError: 0
@@ -76,7 +77,11 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises:
 proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
-        query = paramTuple.query
+        query = try:
+            validate.sanitizeQuery(paramTuple.query)
+        except ValueError as e:
+            debugEcho repr e
+            ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
         imgSqlQuery = images.buildSearchQuery(query)
@@ -200,7 +205,11 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises:
 proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
-        query = paramTuple.query
+        query = try:
+            validate.sanitizeQuery(paramTuple.query)
+        except ValueError as e:
+            debugEcho repr e
+            ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
         imgSqlQuery = images.buildSearchQuery(query)

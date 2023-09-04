@@ -1,0 +1,27 @@
+import std/[
+    strutils
+]
+import regex
+
+{.push raises:[].}
+
+type
+    ValidationError = object of ValueError
+
+const
+    QuerySyntax = re2"""(?x)
+        (
+            -?                      # can be negated
+            ([a-z_]+:)?             # can have a category, limited characterset
+            [a-z_0-9<>!\(\)]+       # tag syntax
+            \s*                     # separated by spaces
+        )+ # take multiple copies
+    """
+proc normalizeSpaces(s: string): string {.raises: [ValueError].} =
+    return s.replace(re2"\s+", " ")
+
+proc sanitizeQuery*(s: string): string {.raises: [ValueError].} =
+    result = s.strip().normalizeSpaces()
+    if not match(result, QuerySyntax):
+        raise newException(ValidationError, "Invalid query!")
+    return result

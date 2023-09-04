@@ -64,7 +64,7 @@ proc buildTagQuery*(includes, excludes: seq[int] = @[]): string {.raises: [Value
     var query: string
 
     if includes.len() < 1:
-        query = "With include_and As ( Select image_id From image_tags Group By image_id )"
+        query = "With include_and As ( Select image_id From image_tags Group By image_id )" # all of them
     else:
         # Collect all non-prefixed tags by an AND relation as including terms
         query = "With include_and As ( With "
@@ -108,6 +108,9 @@ proc buildPageQuery*(
         pageNum, numResults: int,
         descending: bool = false
     ): string =
+        if query == "": # blank query
+            return query
+
         result = "With root_query As ( " & query & " ) "
         result &= "Select * From root_query Where id Not In "
         if descending:
@@ -118,6 +121,9 @@ proc buildPageQuery*(
             result &= "Order By id Asc Limit " & $numResults
 
 proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
+    if query == "":
+        return 0
+
     let db = open(dbFile, "", "", "")
     defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
@@ -216,6 +222,11 @@ proc buildSearchQuery*(
                     discard
         debugEcho repr includes
         debugEcho repr excludes
+
+        if includes.len() == 0:
+            # if there are no matches, just say so
+            return ""
+
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
