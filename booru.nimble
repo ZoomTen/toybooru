@@ -27,10 +27,17 @@ requires [
     "chronicles#1922045"
 ]
 
+# Authentication dependencies
+
+requires [
+    "libsodium#881f3ae"
+]
+
 task cleanDb, "Clean database and image files":
     rmDir("public/images")
     rmDir("public/thumbs")
     rmFile("main.db")
+    rmFile("session.db")
     echo("Go to localhost:5000/ upon restarting the server to re-init the booru.")
 
 task clean, "Clean generated files":
@@ -39,4 +46,4 @@ task clean, "Clean generated files":
         rmFile(binName & ".exe")
 
 task start, "Run server":
-    exec("nimble run booru")
+    exec("nimble -d:chronicles_disabled_topics:\"stdlib\" run booru")

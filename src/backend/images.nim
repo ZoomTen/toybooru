@@ -124,6 +124,9 @@ proc buildPageQuery*(
         pageNum, numResults: int,
         descending: bool = false
     ): string =
+        log.logScope:
+            topics = "buildPageQuery"
+
         if query == "": # blank query
             return query
 
@@ -135,6 +138,15 @@ proc buildPageQuery*(
         else:
             result &= "( Select id From root_query Order By id Asc Limit " & $(numResults * pageNum) & ")"
             result &= "Order By id Asc Limit " & $numResults
+
+        log.debug(
+            "Transformed query to pagination query",
+            query=query,
+            finalQuery=result,
+            pageNum=pageNum,
+            numResults=numResults,
+            descending=descending
+        )
 
 proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
     if query == "":

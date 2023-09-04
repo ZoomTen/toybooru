@@ -1,4 +1,4 @@
-import std/tables
+import std/[tables, times]
 
 const
     siteName* = "toybooru"
@@ -11,15 +11,30 @@ const
     pubDir* = "./public"
     imgDir* = pubDir & imgSuffix
     thumbDir* = pubDir & thumbSuffix
-    dbFile* = "main.db"
 
+# db files also relative to source dir
+    dbFile* = "main.db"
+    sessionDbFile* = "session.db"
+
+# parameters
     thumbSize* = 250 # width or height, whichever's greater
     defaultNumResults* = 25
 
+# link to source code
     sourceLink* = "https://github.com/ZoomTen/toybooru"
 
-let mimeMappings* = {
+# authentication stuffs
+    sessionCookieName* = "TOYBOORU_SESSION"
+    usernameFieldName* = "usn"
+    passwordFieldName* = "pw"
+    confirmPasswordFieldName* = "cfpw"
+    antiCsrfFieldName* = "acsrf"
+
+
+let
+    mimeMappings* = {
         "image/jpeg": "jpg",
         "image/png": "png",
         "video/mp4": "mp4"
     }.toTable
+    defaultSessionExpirationTime* = 30.minutes()

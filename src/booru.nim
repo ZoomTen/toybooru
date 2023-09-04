@@ -6,6 +6,7 @@ import ./backend/setup as setup
 import ./backend/upload as upload
 import ./backend/exceptions
 import ./backend/images as images
+import ./backend/authentication as auth
 
 import std/[
     strutils, json
@@ -29,8 +30,6 @@ router mainRouter:
         )
 
     get "/":
-        setup.folders()
-        setup.database()
         redirect "/list"
 
     get "/list":
@@ -164,4 +163,10 @@ when isMainModule:
     addHandler(chlg)
 
     # Run server
+    setup.folders()
+    setup.imageTable()
+    setup.tagTable()
+    setup.userTable()
+    setup.sessionTable()
+    auth.invalidateExpiredSessions()
     serverMain()

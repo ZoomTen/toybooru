@@ -17,7 +17,7 @@ Clean the database by
 nimble cleanDb
 ```
 
-**Requires SQLite ≥ 3.39.0**
+**Requires SQLite ≥ 3.39.0, libsodium**
 
 ## What's here?
 
