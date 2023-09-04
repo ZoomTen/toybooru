@@ -17,7 +17,7 @@ import chronicles as log
 
 type
     PageVars* = tuple
-        query: string   # contains raw query!
+        query: string ## contains raw query!
         pageNum: int
         numResults: int
 

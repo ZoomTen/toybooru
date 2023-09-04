@@ -21,30 +21,36 @@ router mainRouter:
             siteContent=render.exception(exception),
             params=request.params
         )
+
     error Http404:
         resp Http404, render.masterTemplate(
             siteContent=render.`404`(),
             params=request.params
         )
+
     get "/":
         setup.folders()
         setup.database()
         redirect "/list"
+
     get "/list":
         resp render.masterTemplate(
             siteContent=render.siteList(request.params),
             params=request.params
         )
+
     get "/untagged":
         resp render.masterTemplate(
             siteContent=render.siteUntagged(request.params),
             params=request.params
         )
+
     get "/taglist":
         resp render.masterTemplate(
             siteContent=render.siteAllTags(request.params),
             params=request.params
         )
+
     get "/random":
         if request.params.hasKey("q"):
             let paramized = render.getVarsFromParams(request.params)
@@ -55,6 +61,7 @@ router mainRouter:
         else:
             let randomImgId = images.getRandomIdFrom("Select id From images")
             redirect "/entry/" & $randomImgId
+
     get "/entry/@id":
         var img: ImageEntryRef
         try:
@@ -69,6 +76,7 @@ router mainRouter:
             ),
             params=request.params
         )
+
     get "/entry/@id/edit":
         var img: ImageEntryRef
         try:
@@ -81,6 +89,7 @@ router mainRouter:
             siteContent=render.siteEntryEdit(img),
             params=request.params
         )
+
     post "/entry/@id/edit":
         let
             inImageId = (@"id").parseInt
@@ -88,15 +97,18 @@ router mainRouter:
         upload.clearTags(inImageId)
         upload.assignTags(inImageId, newImageTags)
         redirect "/entry/" & @"id"
+
     get "/entry/@id/delete": # loooooooooooooool
         let inImageId = (@"id").parseInt
         upload.deleteImage(inImageId)
         redirect "/list"
+
     get "/wiki":
         resp render.masterTemplate(
             siteContent=render.siteWiki(),
             params=request.params
         )
+
     post "/upload":
         # don't upload large files or shit will hit the fan
         if not request.formData.hasKey("tags"):
@@ -111,6 +123,7 @@ router mainRouter:
             rawTags
         )
         redirect "/list"
+
     get "/autocomplete/@word":
         var j = %*{}
         for tagEntry in images.getTagAutocompletes(@"word"):
