@@ -7,6 +7,7 @@ import std/[
 ]
 import ../backend/images as images
 import ../backend/validation as validate
+import ../backend/authentication as auth
 import ../settings
 
 import std/db_sqlite
@@ -133,7 +134,9 @@ proc relatedContent(query: string = ""): VNode =
                 li: a(href="/random?q="&query): text "Random pic from this query"
             li: a(href="/untagged"): text "View untagged posts"
 
-proc siteHeader(query: string = ""): VNode =
+proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].} =
+    let (query, pageNum, numResults) = rq.params.getVarsFromParams()
+    let user = auth.getSessionIdFrom(rq).getCurrentUser()
     return buildHtml(header):
         nav(id="mainMenu"):
             tdiv(id="titleAndSearch"):
@@ -141,14 +144,25 @@ proc siteHeader(query: string = ""): VNode =
                 form(class="inputAndSubmit", action="/list", `method`="get"):
                     input(type="search", name="q", autocomplete="off", placeholder="find some_tags", id="searchInput", value=query)
                     input(type="submit", value="Find")
+                hr: text ""
                 ul(class="hidden"):
                     li:
                         a(href="#"): text "Skip navigation"
                     li:
                         a(href="#"): text "Skip to tags"
+            hr: text ""
             ul(class="navLinks", id="headerLinks"):
+                if user.isNone():
+                    li:
+                        a(href="/login"): text "Log in"
+                else:
+                    li:
+                        text "Hey, "
+                        bold: text user.get().name
+                    li:
+                        a(href="/logout"): text "Log out"
                 li:
-                    a(href="/"): text "Front page"
+                    a(href="/"): text "Home"
                 li:
                     a(href="/list"): text "Listing"
                 li:
@@ -215,13 +229,14 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises:
                         )
                     )
 
-proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
+proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
     log.logScope:
         topics = "siteList"
 
     log.debug("Get images to gallery display")
 
     let
+        params = rq.params
         paramTuple = params.getVarsFromParams
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
@@ -257,7 +272,8 @@ proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
                     imageList.buildGallery(query)
                     numPages.buildGalleryPagination(pageNum, numResults, query)
             section(id="tags"):
-                uploadForm()
+                if auth.getCurrentUser(auth.getSessionIdFrom(rq)).isSome():
+                    uploadForm()
                 if imageList.len >= 1:
                     getImageTagsOfListSidebar(params)
                     relatedContent(query)
@@ -361,8 +377,7 @@ proc siteAllTags*(params: Table): VNode {.raises: [DbError, ValueError].} =
                 for tagEntry in tags:
                     tagEntry.toTagDisplay(query)
 
-proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): string =
-    let (query, pageNum, numResults) = params.getVarsFromParams
+proc masterTemplate*(title: string = "", rq: Request, siteContent: VNode): string {.raises:[IOSelectorsException, Exception, ValueError, KeyError].}=
     let
         vn = buildHtml(html):
             head:
@@ -376,16 +391,17 @@ proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): str
                 link(rel="stylesheet", href="/assets/screen.css")
             body:
                 tdiv(id="pageContainer"):
-                    siteHeader(query)
+                    siteHeader(rq)
                     siteContent
                 footer:
+                    hr: text ""
                     text "© 2023 Zumi. Source code is available "
                     a(href=sourceLink): text "here"
                     text "."
                 script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 
-proc landingPage*(): string {.raises: [ValueError, DbError].}=
+proc landingPage*(rq: Request): string {.raises: [ValueError, DbError, IOSelectorsException, Exception].}=
     let
         postCount = images.getCountOfQuery("Select * From images")
         vn = buildHtml(html):
@@ -397,10 +413,11 @@ proc landingPage*(): string {.raises: [ValueError, DbError].}=
             body:
                 tdiv(id="landingContainer"):
                     tdiv:
-                        siteHeader()
+                        siteHeader(rq)
                         main:
                             p(class="landingStats"): text "Browse through $# images" % [($postCount).insertSep(',')]
                 footer:
+                    hr: text ""
                     text "© 2023 Zumi. Source code is available "
                     a(href=sourceLink): text "here"
                     text "."
@@ -426,3 +443,62 @@ proc `404`*(): VNode =
         section(id="wiki"):
             h2: text "HTTP 404 Not Found"
             p: text "The specified page is not found."
+
+proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].}=
+    let newToken = auth.setNewAcsrfToken(
+        auth.getSessionIdFrom(rq)
+    )
+    return buildHtml(main):
+        hr: text ""
+        ul(id="notifications"):
+            for e in errors:
+                li: text $(e.msg)
+        section(id="wiki"):
+            form(action="/login", `method`="post", class="formBox"):
+                h2: text "Log in"
+                input(hidden=true, type="text", name=antiCsrfFieldName, value=newToken)
+                tdiv(class="formRow"):
+                    label(`for`=usernameFieldName): text "Username"
+                    input(id=usernameFieldName, name=usernameFieldName, type="text", placeholder="PenguinOfDoom")
+                tdiv(class="formRow"):
+                    label(`for`=passwordFieldName): text "Password"
+                    input(id=passwordFieldName, name=passwordFieldName, type="password", placeholder="hunter2")
+                input(type="submit", value="Login")
+                span:
+                    a(href="/signup"): text "Or sign up"
+
+proc signUp*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].}=
+    let newToken = auth.setNewAcsrfToken(
+        auth.getSessionIdFrom(rq)
+    )
+    return buildHtml(main):
+        hr: text ""
+        ul(id="notifications"):
+            for e in errors:
+                li: text $(e.msg)
+        section(id="wiki"):
+            form(action="/signup", `method`="post", class="formBox"):
+                h2: text "Sign up"
+                p: text "Signing up for an account allows you to personalize tag blacklists, among other things."
+                input(hidden=true, type="text", name=antiCsrfFieldName, value=newToken)
+                tdiv(class="formRow"):
+                    label(`for`=usernameFieldName): text "Username"
+                    input(id=usernameFieldName, name=usernameFieldName, type="text", placeholder="PenguinOfDoom")
+                tdiv(class="formRow"):
+                    label(`for`=passwordFieldName): text "Password"
+                    input(id=passwordFieldName, name=passwordFieldName, type="password", placeholder="hunter2")
+                tdiv(class="formRow"):
+                    label(`for`=confirmPasswordFieldName): text "Confirm password"
+                    input(id=confirmPasswordFieldName, name=confirmPasswordFieldName, type="password", placeholder="hunter2")
+                input(type="submit", value="Sign up")
+                span:
+                    a(href="/login"): text "Or log in"
+
+proc signUpSuccess*(): VNode =
+    return buildHtml(main):
+        section(id="wiki"):
+            h2: text "Sign up successful!"
+            p:
+                text "Now that you've signed up, how about you "
+                a(href="/login"): text "log in to it"
+                text " now?"

@@ -13,6 +13,8 @@ import ./exceptions
 import std/db_sqlite
 
 export options
+export selectors
+export sodium
 
 {.push raises: [].}
 
@@ -146,9 +148,12 @@ proc verifyAcsrfToken*(sessId: string, acsrfToken: string) {.raises: [DbError, T
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     if sessDb.getValue(sql"""Select 1 From session_acsrf Where sid = ? And token = ?""", sessId, acsrfToken) != "1":
-        raise newException(TokenException, "Invalid token")
+        raise newException(TokenException, "Please try again...")
 
 proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]] {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError, Exception].} =
+    let mainDb = open(dbFile, "", "", "")
+    defer: mainDb.close()
+
     var errors: seq[ref Exception] = @[]
     let
         sessId = getSessionIdFrom(req)
@@ -164,6 +169,10 @@ proc processSignUp*(req: Request): tuple[user: Option[User], password: string, e
     if rqUsername == "":
         errors.add(
             newException(LoginException, "Username missing!")
+        )
+    if mainDb.getValue(sql"Select 1 From users Where username = ?", rqUsername) == "1":
+        errors.add(
+            newException(LoginException, "Someone else already has that username!")
         )
     # add additional checks for username here
     if rqPassword == "":
@@ -191,16 +200,22 @@ proc doSignUp*(user: User, pw: string) {.raises: [DbError, SodiumError, ValueErr
 
     let pwHashed = cryptoPwHashStr(pw)
 
+    log.debug("Someone has signed up", userName=user.name)
+
     mainDb.exec(sql"""
         Insert Into users(username, password, joined_on)
         Values (?, ?, ?)
     """, user.name, pwHashed, user.joinedOn.toUnix())
 
-proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception]] {.raises: [DbError, ValueError, IOSelectorsException, SodiumError, Exception].}=
+proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception], alreadyLoggedIn: bool] {.raises: [DbError, ValueError, IOSelectorsException, SodiumError, Exception].}=
+    log.logScope:
+        topics = "processLogIn"
+
     let isUser = getSessionIdFrom(req).getCurrentUser()
     if isUser.isSome():
+        log.debug("User already logged in", user=isUser.get().name)
         # skip the login process
-        return (user: isUser, errors: @[])
+        return (user: isUser, errors: @[], alreadyLoggedIn: true)
 
     let
         sessionDb = open(sessionDbFile, "", "", "")
@@ -223,29 +238,33 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
         uname = req.params.getOrDefault(usernameFieldName, "").strip()
         pw = req.params.getOrDefault(passwordFieldName, "")
 
-    let user = userDb.getRow(sql"Select * From users Where username = ?", uname)
+    let user = userDb.getRow(sql"Select id, username, joined_on, logged_in, password From users Where username = ?", uname)
 
-    if user == @[]:
-        errors.add(newException(LoginException, "Username or password invalid"))
-    else:
-        # user in db
-        if not cryptoPwHashStrVerify(user[2], pw):
-            errors.add(newException(LoginException, "Username or password invalid"))
-
-    if user == @[]:
+    if user[0] == "":
+        errors.add(newException(LoginException, "(Username) or password invalid"))
         return (
             user: none(User),
-            errors: errors
+            errors: errors,
+            alreadyLoggedIn: false
         )
     else:
+        # user in db
+        if not cryptoPwHashStrVerify(user[4], pw):
+            errors.add(newException(LoginException, "Username or (password) invalid"))
+            return (
+                user: none(User),
+                errors: errors,
+                alreadyLoggedIn: false
+            )
         return (
             user: some(userFromRow(user)),
-            errors: errors
+            errors: errors,
+            alreadyLoggedIn: false
         )
 
-proc doLogin*(sessId: string, user: User) {.raises: [DbError].}=
+proc doLogIn*(sessId: string, user: User) {.raises: [DbError].}=
     log.logScope:
-        topics = "doLogin"
+        topics = "doLogIn"
 
     let
         sessionDb = open(sessionDbFile, "", "", "")
@@ -255,11 +274,18 @@ proc doLogin*(sessId: string, user: User) {.raises: [DbError].}=
         userDb.close()
     sessionDb.exec(sql"PRAGMA foreign_keys = ON")
 
+    # check if session is valid
+    if sessionDb.getValue(
+        sql"Select 1 From sessions Where sid = ?", sessId
+    ) != "1":
+        log.debug("Someone's trying to log in but their session expired...")
+        return
+
     sessionDb.exec(
         sql"Insert Into session_user(sid, user_id) Values (?, ?)",
         sessId, user.id
     )
-    log.debug("Associated a session with one user", sessId=sessId, userName=user.name)
+    log.debug("Someone has logged in", sessId=sessId, userName=user.name)
 
     userDb.exec(
         sql"Update users Set logged_in = ? Where id = ?",
@@ -272,5 +298,7 @@ proc logOut*(sessId: string) {.raises: [DbError].}=
     let sessionDb = open(sessionDbFile, "", "", "")
     sessionDb.exec(sql"PRAGMA foreign_keys = ON")
     defer: sessionDb.close()
+
+    log.debug("A user logged out", sessId=sessId)
 
     sessionDb.exec(sql"""Delete From sessions Where sid = ?""", sessId)

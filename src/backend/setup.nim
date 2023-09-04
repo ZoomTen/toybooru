@@ -59,7 +59,7 @@ proc tagTable*() {.raises: [DbError].}=
         tag_id      Integer Not Null,
         Foreign Key("image_id") References "images"("id") On Delete Cascade,
         Foreign Key("tag_id") References "tags"("id") On Delete Cascade,
-        Unique("image_id", "tag_id")
+        Unique(image_id, tag_id)
     )
     """)
     log.info("Initialized image/tag relation table")
@@ -106,7 +106,8 @@ proc sessionTable*() {.raises: [DbError].} =
         Create Table If Not Exists session_user (
             sid Text Not Null,
             user_id Integer Not Null,
-            Foreign Key (sid) References sessions(sid) On Delete Cascade
+            Foreign Key (sid) References sessions(sid) On Delete Cascade,
+            Unique(sid, user_id)
         )
     """)
     log.info("Initialized session/user relation table")
@@ -116,7 +117,8 @@ proc sessionTable*() {.raises: [DbError].} =
         Create Table If Not Exists session_acsrf (
             sid Text Not Null,
             token Text,
-            Foreign Key (sid) References sessions(sid) On Delete Cascade
+            Foreign Key (sid) References sessions(sid) On Delete Cascade,
+            Unique(sid, token)
         )
     """)
     log.info("Initialized session anti-CSRF table")

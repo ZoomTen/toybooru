@@ -18,39 +18,46 @@ import chronicles as log
 
 router mainRouter:
     error Exception:
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request)) # throw cookie back at the client
         resp Http500, render.masterTemplate(
             siteContent=render.exception(exception),
-            params=request.params
+            rq=request
         )
 
     error Http404:
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp Http404, render.masterTemplate(
             siteContent=render.`404`(),
-            params=request.params
+            rq=request
         )
 
     get "/":
-        resp render.landingPage()
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        resp render.landingPage(request)
 
     get "/list":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
-            siteContent=render.siteList(request.params),
-            params=request.params
+            siteContent=render.siteList(request),
+            rq=request
         )
 
     get "/untagged":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
             siteContent=render.siteUntagged(request.params),
-            params=request.params
+            rq=request
         )
 
     get "/taglist":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
             siteContent=render.siteAllTags(request.params),
-            params=request.params
+            rq=request
         )
 
     get "/random":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         if request.params.hasKey("q"):
             let paramized = render.getVarsFromParams(request.params)
             let randomImgId = images.getRandomIdFrom(
@@ -62,6 +69,7 @@ router mainRouter:
             redirect "/entry/" & $randomImgId
 
     get "/entry/@id":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         var img: ImageEntryRef
         try:
             img = images.getQueried(
@@ -73,10 +81,11 @@ router mainRouter:
             siteContent=render.siteEntry(img,
                 query=render.getVarsFromParams(request.params).query
             ),
-            params=request.params
+            rq=request
         )
 
     get "/entry/@id/edit":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         var img: ImageEntryRef
         try:
             img = images.getQueried(
@@ -86,10 +95,11 @@ router mainRouter:
             resp Http404
         resp render.masterTemplate(
             siteContent=render.siteEntryEdit(img),
-            params=request.params
+            rq=request
         )
 
     post "/entry/@id/edit":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         let
             inImageId = (@"id").parseInt
             newImageTags = request.params.getOrDefault("tags")
@@ -98,17 +108,20 @@ router mainRouter:
         redirect "/entry/" & @"id"
 
     get "/entry/@id/delete": # loooooooooooooool
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         let inImageId = (@"id").parseInt
         upload.deleteImage(inImageId)
         redirect "/list"
 
     get "/wiki":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
             siteContent=render.siteWiki(),
-            params=request.params
+            rq=request
         )
 
     post "/upload":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         # don't upload large files or shit will hit the fan
         if not request.formData.hasKey("tags"):
             raise newException(BooruException, "No tags defined?")
@@ -124,10 +137,62 @@ router mainRouter:
         redirect "/list"
 
     get "/autocomplete/@word":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         var j = %*{}
         for tagEntry in images.getTagAutocompletes(@"word"):
             j[tagEntry.tag] = %(tagEntry.count)
         resp $j, contentType="application/json"
+
+    get "/login":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        resp render.masterTemplate(
+            siteContent=render.logIn(request),
+            rq=request
+        )
+
+    post "/login":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        let (user, errors, alreadyLoggedIn) = auth.processLogIn(request)
+        if user.isNone():
+            resp Http400, render.masterTemplate(
+                siteContent=render.logIn(request, errors),
+                rq=request
+            )
+        else:
+            if not alreadyLoggedIn:
+                auth.doLogIn(
+                    auth.getSessionIdFrom(request),
+                    user.get()
+                )
+            redirect "/"
+
+    get "/signup":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        resp render.masterTemplate(
+            siteContent=render.signUp(request),
+            rq=request
+        )
+
+    post "/signup":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        let (user, password, errors) = auth.processSignUp(request)
+        if user.isNone():
+            resp render.masterTemplate(
+                siteContent=render.signUp(request, errors),
+                rq=request
+            )
+        else:
+            auth.doSignUp(user.get(), password)
+            resp render.masterTemplate(
+                siteContent=render.signUpSuccess(),
+                rq=request
+            )
+
+    get "/logout": # loooooooooooooooool
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        auth.getSessionIdFrom(request).logOut()
+        redirect "/"
+
 
 proc serverMain() =
     let settings = newSettings(bindAddr="127.0.0.1", numThreads=16, staticDir=pubDir)

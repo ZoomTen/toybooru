@@ -32,7 +32,7 @@ nimble cleanDb
 
 ## Todo
 
-- User accounts
+- User accounts (getting there)
 - Wiki
 - Adding source to images
 - Comments, maybe?
