@@ -150,6 +150,8 @@ proc siteHeader(query: string = ""): VNode =
                 li:
                     a(href="/"): text "Front page"
                 li:
+                    a(href="/list"): text "Listing"
+                li:
                     a(href="/wiki"): text "Wiki"
 
 proc uploadForm(): VNode =
@@ -376,6 +378,28 @@ proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): str
                 tdiv(id="pageContainer"):
                     siteHeader(query)
                     siteContent
+                footer:
+                    text "© 2023 Zumi. Source code is available "
+                    a(href=sourceLink): text "here"
+                    text "."
+                script(src="/assets/autocomplete.js")
+    return "<!DOCTYPE html>\n" & $vn
+
+proc landingPage*(): string {.raises: [ValueError, DbError].}=
+    let
+        postCount = images.getCountOfQuery("Select * From images")
+        vn = buildHtml(html):
+            head:
+                meta(charset="utf-8")
+                title: text siteName
+                meta(name="viewport", content="width=device-width,initial-scale=1")
+                link(rel="stylesheet", href="/assets/screen.css")
+            body:
+                tdiv(id="landingContainer"):
+                    tdiv:
+                        siteHeader()
+                        main:
+                            p(class="landingStats"): text "Browse through $# images" % [($postCount).insertSep(',')]
                 footer:
                     text "© 2023 Zumi. Source code is available "
                     a(href=sourceLink): text "here"

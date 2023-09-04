@@ -30,7 +30,7 @@ router mainRouter:
         )
 
     get "/":
-        redirect "/list"
+        resp render.landingPage()
 
     get "/list":
         resp render.masterTemplate(

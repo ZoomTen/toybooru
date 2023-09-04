@@ -80,10 +80,26 @@ body {
 	font-size: 0 !important;
 }
 
-#pageContainer {
+#pageContainer, #landingContainer {
 	display: flex;
 	flex-direction: column;
 	min-height: calc(100vh - var(--footer-height));
+}
+
+#landingContainer {
+	justify-content: space-around;
+	max-width: 35em;
+	margin: auto;
+}
+
+.landingStats {
+	text-align: center;
+}
+
+#landingContainer #mainMenu {
+	flex-direction: column;
+	gap: 0;
+	padding-bottom: 2em;
 }
 
 #pageContainer > main {
