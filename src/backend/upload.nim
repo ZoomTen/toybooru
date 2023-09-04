@@ -31,7 +31,7 @@ proc fileFromReq*(
     req: tuple[fields: StringTableRef, body: string]
 ): FileUploadRef {.raises:[KeyError].} =
     result = newFileUploadRef(
-        req.body, req.body.len, req.fields["filename"], req.fields["Content-Type"]
+        req.body, req.body.len(), req.fields["filename"], req.fields["Content-Type"]
     )
 
 proc clearTags*(imageId: int) {.raises:[DbError].} =
@@ -46,7 +46,7 @@ proc refreshTagCounts*() {.raises:[DbError].} =
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
 proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].} =
-    if tags.strip == "": return
+    if tags.strip() == "": return
 
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -55,7 +55,7 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
     if db.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
         raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
 
-    for tag in tags.strip.split(" ").deduplicate():
+    for tag in tags.strip().split(" ").deduplicate():
         if tag == "": continue
         if tag[0] == '-':
             raise newException(BooruException, "Tag " & tag & " cannot start with a minus!")
@@ -63,12 +63,12 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
         var tagRowId: int64
         try: # does tag exist?
             tagRowId = db.getValue(
-                sql"""Select id From tags Where tag = ?""", tag.strip
+                sql"""Select id From tags Where tag = ?""", tag.strip()
             ).parseInt()
         except ValueError: # tag doesn't exist, so add it
             tagRowId = db.tryInsertID(sql"""
                 Insert Into tags ("tag") Values (?)
-            """, tag.strip)
+            """, tag.strip())
             if tagRowId == -1:
                 raise newException(BooruException, "Failed inserting tag " & tag & " into db!")
         # increment count
@@ -87,9 +87,9 @@ proc assignTags*(imageId: int, tags: string) {.raises:[DbError, BooruException].
 proc genThumbSize(width, height: int): array[0..1, int] =
     result = [thumbSize, thumbSize]
     if width/height > 1.0: # if wide
-        result[1] = int(thumbSize.float * (height/width))
+        result[1] = int(thumbSize.float() * (height/width))
     else: # if tall
-        result[0] = int(thumbSize.float * (width/height))
+        result[0] = int(thumbSize.float() * (width/height))
 
 proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     BooruException, STBIException, IOError, OSError, Exception
@@ -106,7 +106,7 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     except KeyError:
         raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png.")
 
-    let hashExists = db.getValue(sql"""Select id From images Where hash = ?""", hash)
+    let hashExists = db.getValue(sql"Select id From images Where hash = ?", hash)
     if hashExists != "":
         raise newException(BooruException, "An image with this hash already exists: " & hashExists)
     else:
@@ -138,8 +138,8 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
                     raise newException(BooruException, "Error processing video!")
                 let
                     whx = wh.split("x")
-                    width = whx[0].strip.parseInt
-                    height = whx[1].strip.parseInt
+                    width = whx[0].strip().parseInt()
+                    height = whx[1].strip().parseInt()
                     genThumbSize = genThumbSize(width, height)
 
                 (wh, ex) = execCmdEx(

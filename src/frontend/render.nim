@@ -10,6 +10,8 @@ import ../settings
 
 import std/db_sqlite
 
+{.push raises: [].}
+
 type
     PageVars* = tuple
         query: string
@@ -17,15 +19,15 @@ type
         numResults: int
 
 proc getVarsFromParams*(params: Table): PageVars =
-    result.query = params.getOrDefault("q").strip
+    result.query = params.getOrDefault("q").strip()
     result.pageNum = try:
-            params.getOrDefault("page", "0").parseInt
+            params.getOrDefault("page", "0").parseInt()
         except ValueError: 0
     result.numResults = try:
-            params.getOrDefault("count", $defaultNumResults).parseInt
+            params.getOrDefault("count", $defaultNumResults).parseInt()
         except ValueError: defaultNumResults
 
-proc genericMakeTagText(tagGet: TagTuple): VNode =
+proc genericMakeTagText(tagGet: TagTuple): VNode {.raises: [ValueError].} =
     let isNamespaced = tagGet.tag.find(":")
     if isNamespaced == -1:
         return buildHtml(span):
@@ -40,8 +42,8 @@ proc genericMakeTagText(tagGet: TagTuple): VNode =
 proc compareTags(a, b: TagTuple): int =
     cmp(a.tag, b.tag)
 
-proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode =
-    let q = query.strip
+proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode {.raises: [ValueError].} =
+    let q = query.strip()
     return buildHtml(li):
         a(href="/list?q="&q&"+"&tagEntry.tag, title="add to search"): text "+"
         text " "
@@ -51,7 +53,7 @@ proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode =
         text " "
         genericMakeTagText tagEntry
 
-proc getPopularTagsSidebar(): VNode =
+proc getPopularTagsSidebar(): VNode {.raises: [DbError, ValueError].}=
     var popularTags = images.getMostPopularTagsGeneral(25)
     popularTags.sort(compareTags)
     return buildHtml(nav):
@@ -61,8 +63,8 @@ proc getPopularTagsSidebar(): VNode =
                 tagEntry.toTagDisplay
         # a(href="#"): text "View all tags"
 
-proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
-    let tags = images.getTagsFor img
+proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises: [DbError, ValueError].}=
+    let tags = images.getTagsFor(img)
     return buildHtml(nav):
         if tags.len > 0:
             h2: text "Tags in image"
@@ -71,7 +73,7 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
                     tagEntry.toTagDisplay(query)
         a(href="/taglist"): text "View all tags"
 
-proc getImageTagsOfListSidebar*(params: Table): VNode =
+proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
         query = paramTuple.query
@@ -184,7 +186,7 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): 
                 li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & query): text ">"
                 li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & query): text ">>"
 
-proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode =
+proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises: [DbError, ValueError].} =
     return buildHtml(ul(class="galleryItems navLinks")):
         for img in imageList:
             li:
@@ -195,7 +197,7 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode =
                         )
                     )
 
-proc siteList*(params: Table): VNode =
+proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
         query = paramTuple.query
@@ -229,7 +231,7 @@ proc siteList*(params: Table): VNode =
                     getImageTagsOfListSidebar(params)
                     relatedContent(query)
 
-proc siteUntagged*(params: Table): VNode =
+proc siteUntagged*(params: Table): VNode {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
         query = ""
@@ -258,7 +260,7 @@ proc siteUntagged*(params: Table): VNode =
                     imageList.buildGallery(query)
                     numPages.buildGalleryPagination(pageNum, numResults, query)
 
-proc siteEntry*(img: ImageEntryRef, query: string): VNode =
+proc siteEntry*(img: ImageEntryRef, query: string): VNode {.raises: [DbError, KeyError, ValueError].} =
     let
         ext = mimeMappings[img.formatMime]
         imgLink = "/images/" & img.hash & "." & ext
@@ -294,7 +296,7 @@ proc siteEntry*(img: ImageEntryRef, query: string): VNode =
                 getImageTagsSidebar(img, query)
                 relatedContent(query)
 
-proc siteEntryEdit*(img: ImageEntryRef): VNode =
+proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
     return buildHtml(main):
         section(id="image"):
             img(
@@ -318,7 +320,7 @@ proc siteWiki*(): VNode =
             # TODO: markdown and RST conversion here
             p: text "Not available yet!"
 
-proc siteAllTags*(params: Table): VNode =
+proc siteAllTags*(params: Table): VNode {.raises: [DbError, ValueError].} =
     let (query, pageNum, numResults) = params.getVarsFromParams
     let tags = images.getAllTags()
     return buildHtml(main):

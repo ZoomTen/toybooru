@@ -11,6 +11,8 @@ import std/[
     strutils, json
 ]
 
+# exception handling not quite needed here
+
 router mainRouter:
     error Exception:
         resp Http500, render.masterTemplate(

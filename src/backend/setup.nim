@@ -4,12 +4,14 @@ import ../settings
 # db stuff, change for 2.0.0
 import std/db_sqlite
 
-proc folders*() =
+{.push raises:[].}
+
+proc folders*() {.raises: [OSError, IOError].}=
     # setup image bins
     for dir in [imgDir, thumbDir]:
         createDir(dir)
 
-proc database*() =
+proc database*() {.raises: [DbError].}=
     # setup sqlite db
     let db = open(dbFile, "", "", "")
     defer: db.close()

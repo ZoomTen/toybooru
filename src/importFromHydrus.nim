@@ -3,6 +3,9 @@ import ./backend/upload as upload
 import std/[
     os, mimetypes, strutils, sugar
 ]
+
+{.push raises: [].}
+
 when isMainModule:
     var args = commandLineParams()
     let mimes = newMimetypes()

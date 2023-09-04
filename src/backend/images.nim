@@ -15,14 +15,16 @@ type
         tag: string
         count: int
 
+{.push raises:[].}
+
 ## Get query as a sequence of ImageEntryRef, must match the column *order*
 ## of the images table.
-proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
+proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.raises:[DbError, ValueError].}=
     result = @[]
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
-    for row in db.instantRows(query.sql, args):
+    for row in db.instantRows(query.sql(), args):
         result.add(
             ImageEntryRef(
                 id: row[0].parseInt(),
@@ -58,10 +60,10 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     Inner Join images On image_id = images.id
     Where image_id Not In exclude_or
 ]#
-proc buildTagQuery*(includes, excludes: seq[int] = @[]): string =
+proc buildTagQuery*(includes, excludes: seq[int] = @[]): string {.raises: [ValueError].}=
     var query: string
 
-    if includes.len < 1:
+    if includes.len() < 1:
         query = "With include_and As ( Select image_id From image_tags Group By image_id )"
     else:
         # Collect all non-prefixed tags by an AND relation as including terms
@@ -80,7 +82,7 @@ proc buildTagQuery*(includes, excludes: seq[int] = @[]): string =
         query &= " Group By image_tags.image_id )"
 
     # Collect all tags prefixed with - by an OR relation as excluding terms
-    if excludes.len >= 1:
+    if excludes.len() >= 1:
         query &= ", exclude_or As ( With "
         query &= "xtags As ( Select image_id From image_tags Where tag_id In ("
         let excludesTagId = collect:
@@ -94,7 +96,7 @@ proc buildTagQuery*(includes, excludes: seq[int] = @[]): string =
 
     query &= " Select images.* From include_and Inner Join images On image_id = images.id"
 
-    if excludes.len >= 1:
+    if excludes.len() >= 1:
         query &= " Where image_id Not In exclude_or"
 
     debugEcho query
@@ -115,31 +117,31 @@ proc buildPageQuery*(
             result &= "( Select id From root_query Order By id Asc Limit " & $(numResults * pageNum) & ")"
             result &= "Order By id Asc Limit " & $numResults
 
-proc getCountOfQuery*(query: string): int =
+proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
     let db = open(dbFile, "", "", "")
     defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select Count(1) From root_query"
-    return db.getValue(cxquery.sql).parseInt
+    return db.getValue(cxquery.sql()).parseInt()
 
-proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple] =
+proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  {.raises:[DbError, ValueError].}=
     result = @[]
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
     for row in db.instantRows(sql"Select tag, count From tags Order By count Desc Limit ?", numberOfTags):
         result.add(
-            (tag: row[0], count: row[1].parseInt)
+            (tag: row[0], count: row[1].parseInt())
         )
 
-proc getRandomIdFrom*(query: string): int =
+proc getRandomIdFrom*(query: string): int  {.raises:[DbError, ValueError].}=
     let db = open(dbFile, "", "", "")
     defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select id From root_query Order By Random() Limit 1"
-    return db.getValue(cxquery.sql).parseInt
+    return db.getValue(cxquery.sql()).parseInt()
 
-proc getTagsFor*(image: ImageEntryRef): seq[TagTuple] =
+proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  {.raises:[DbError, ValueError].}=
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
@@ -153,10 +155,10 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple] =
         """, $image.id
     ):
         result.add(
-            (tag: row[0], count: row[1].parseInt)
+            (tag: row[0], count: row[1].parseInt())
         )
 
-proc getAllTags*(): seq[TagTuple] =
+proc getAllTags*(): seq[TagTuple]  {.raises:[DbError, ValueError].}=
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
@@ -164,7 +166,7 @@ proc getAllTags*(): seq[TagTuple] =
 
     for row in db.instantRows(sql"Select tag, count From tags Order By tag Asc"):
         result.add(
-            (tag: row[0], count: row[1].parseInt)
+            (tag: row[0], count: row[1].parseInt())
         )
 
 proc tagsAsString*(tags: seq[TagTuple]): string =
@@ -177,8 +179,8 @@ proc buildSearchQuery*(
         query: string = "",
         pageNum:int = 0,
         numResults:int = defaultNumResults
-    ): string =
-        if query.strip == "":
+    ): string {.raises:[DbError, ValueError].}=
+        if query.strip() == "":
             return "Select * From images"
 
         var
@@ -189,7 +191,7 @@ proc buildSearchQuery*(
         defer: db.close()
 
         for q in query.split(" "):
-            var queryElement = q.strip
+            var queryElement = q.strip()
             if queryElement == "": continue
             if queryElement[0] == '-':
                 queryElement = queryElement.substr(1)
@@ -198,7 +200,7 @@ proc buildSearchQuery*(
                         db.getValue(
                             sql"Select id From tags Where tag = ?",
                             queryElement
-                        ).parseInt
+                        ).parseInt()
                     )
                 except ValueError:
                     discard
@@ -208,7 +210,7 @@ proc buildSearchQuery*(
                         db.getValue(
                             sql"Select id From tags Where tag = ?",
                             queryElement
-                        ).parseInt
+                        ).parseInt()
                     )
                 except ValueError:
                     discard
@@ -217,7 +219,7 @@ proc buildSearchQuery*(
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
-proc getTagAutocompletes*(keyword: string): seq[TagTuple] =
+proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, ValueError].} =
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
@@ -229,5 +231,5 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple] =
         keyword
     ):
         result.add(
-            (tag: row[0], count: row[1].parseInt)
+            (tag: row[0], count: row[1].parseInt())
         )
