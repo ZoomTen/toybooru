@@ -9,7 +9,7 @@ Has not been fuzzed yet and I'm not even sure the queries are secure yet—**do 
 You should put it behind something like Nginx, maybe to enforce file size limits?
 
 ```
-nimble run booru
+nimble start
 ```
 
 Clean the database by

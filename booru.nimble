@@ -22,9 +22,10 @@ requires [
 ]
 
 # Debug dependencies
-# requires [
-#     "print"
-# ]
+
+requires [
+    "chronicles#1922045"
+]
 
 task cleanDb, "Clean database and image files":
     rmDir("public/images")
@@ -36,3 +37,6 @@ task clean, "Clean generated files":
     for binName in bin:
         rmFile(binName)
         rmFile(binName & ".exe")
+
+task start, "Run server":
+    exec("nimble run booru")

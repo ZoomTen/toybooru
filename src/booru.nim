@@ -11,6 +11,8 @@ import std/[
     strutils, json
 ]
 
+import chronicles as log
+
 # exception handling not quite needed here
 
 router mainRouter:
@@ -115,10 +117,38 @@ router mainRouter:
             j[tagEntry.tag] = %(tagEntry.count)
         resp $j, contentType="application/json"
 
-proc main() =
+proc serverMain() =
     let settings = newSettings(bindAddr="127.0.0.1", numThreads=16, staticDir=pubDir)
     var jester = initJester(mainRouter, settings=settings)
     jester.serve()
 
 when isMainModule:
-    main()
+    import std/logging
+
+    # Pass all stdlib logging messages to chronicles
+    type
+        ChroniclesLogger = ref object of Logger
+
+    method log(logger: ChroniclesLogger, level: Level, args: varargs[string, `$`]) =
+        log.logScope:
+            topics = "stdlib"
+        case level:
+            of lvlAll: log.info("", message=args.join(" "))
+            of lvlDebug: log.debug("", message=args.join(" "))
+            of lvlInfo: log.info("", message=args.join(" "))
+            of lvlNotice: log.notice("", message=args.join(" "))
+            of lvlWarn: log.warn("", message=args.join(" "))
+            of lvlError: log.error("", message=args.join(" "))
+            of lvlFatal: log.fatal("", message=args.join(" "))
+            of lvlNone: discard
+
+    proc newChroniclesLogger(levelThreshold = lvlAll, fmtStr = defaultFmtStr): ChroniclesLogger =
+        new result
+        result.fmtStr = fmtStr
+        result.levelThreshold = levelThreshold
+
+    let chlg = newChroniclesLogger()
+    addHandler(chlg)
+
+    # Run server
+    serverMain()

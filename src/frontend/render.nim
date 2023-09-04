@@ -11,6 +11,8 @@ import ../settings
 
 import std/db_sqlite
 
+import chronicles as log
+
 {.push raises: [].}
 
 type
@@ -75,6 +77,11 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises:
         a(href="/taglist"): text "View all tags"
 
 proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueError].} =
+    log.logScope:
+        topics = "getImageTagsOfListSidebar"
+
+    log.debug("Get image tags to sidebar")
+
     let
         paramTuple = params.getVarsFromParams
         pageNum = paramTuple.pageNum
@@ -99,7 +106,7 @@ proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueE
             )
         )
     except ValueError as e:
-        debugEcho "getImageTags: invalid query: " & paramTuple.query
+        log.debug("Invalid query", query=paramTuple.query)
 
     var totalTags: seq[TagTuple] = @[]
 
@@ -207,6 +214,11 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises:
                     )
 
 proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
+    log.logScope:
+        topics = "siteList"
+
+    log.debug("Get images to gallery display")
+
     let
         paramTuple = params.getVarsFromParams
         pageNum = paramTuple.pageNum
@@ -231,7 +243,7 @@ proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
             )
         )
     except ValueError as e:
-        debugEcho "siteList: invalid query: " & paramTuple.query
+        log.debug("Invalid query", query=paramTuple.query)
 
     return buildHtml(main):
         tdiv(class="contentWithTags"):
@@ -372,8 +384,11 @@ proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): str
     return "<!DOCTYPE html>\n" & $vn
 
 proc exception*(exception: ref Exception): VNode =
-    debugEcho exception.name
-    debugEcho exception.msg
+    log.logScope:
+        topics = "exception"
+
+    log.error("Exception occured!", name=exception.name, message=exception.msg)
+
     return buildHtml(main):
         section(id="wiki"):
             h2: text "HTTP 500 Error"

@@ -7,6 +7,8 @@ import ./validation as validate
 # db stuff, change for 2.0.0
 import std/db_sqlite
 
+import chronicles as log
+
 type
     ImageEntryRef* = ref object
         id*: int
@@ -62,7 +64,17 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.rai
     Where image_id Not In exclude_or
 ]#
 proc buildTagQuery*(includes, excludes: seq[int] = @[]): string {.raises: [ValueError].}=
+    log.logScope:
+        topics = "buildTagQuery"
+
     var query: string
+
+    log.debug("Query building",
+              includes = includes,
+              excludes = excludes,
+              includeCount = includes.len(),
+              excludeCount = excludes.len()
+              )
 
     if includes.len() < 1:
         query = "With include_and As ( Select image_id From image_tags Group By image_id )" # all of them
@@ -100,7 +112,10 @@ proc buildTagQuery*(includes, excludes: seq[int] = @[]): string {.raises: [Value
     if excludes.len() >= 1:
         query &= " Where image_id Not In exclude_or"
 
-    debugEcho query
+    log.debug(
+        "Resulting query",
+        query = query
+        )
     return query
 
 # https://gist.github.com/ssokolow/262503
@@ -187,7 +202,13 @@ proc buildSearchQuery*(
         pageNum:int = 0,
         numResults:int = defaultNumResults
     ): string {.raises:[DbError, ValueError].}=
+        log.logScope:
+            topics = "buildSearchQuery"
+
+        log.debug("Query input", query=query)
+
         if query.strip() == "":
+            log.debug("Empty query, selecting all images")
             return "Select * From images"
 
         var
@@ -202,6 +223,7 @@ proc buildSearchQuery*(
             if queryElement == "": continue
             if queryElement[0] == '-':
                 queryElement = queryElement.substr(1)
+                log.debug("Negating keyword", keyword=queryElement)
                 try:
                     excludes.add(
                         db.getValue(
@@ -210,8 +232,10 @@ proc buildSearchQuery*(
                         ).parseInt()
                     )
                 except ValueError:
+                    log.debug("Keyword not found", keyword=queryElement)
                     discard
             else:
+                log.debug("Adding keyword", keyword=queryElement)
                 try:
                     includes.add(
                         db.getValue(
@@ -220,18 +244,20 @@ proc buildSearchQuery*(
                         ).parseInt()
                     )
                 except ValueError:
+                    log.debug("Keyword not found", keyword=queryElement)
                     discard
-        debugEcho repr includes
-        debugEcho repr excludes
 
         if includes.len() == 0:
             # if there are no matches, just say so
+            log.debug("No matches, returning empty query")
             return ""
 
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
 proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, ValueError].} =
+    log.logScope:
+        topics = "getTagAutocompletes"
 
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -248,5 +274,5 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, Val
                 (tag: row[0], count: row[1].parseInt())
             )
     except ValidationError:
-        debugEcho "keyword invalid: " & keyword
+        log.debug("Keyword invalid", keyword=keyword)
         return result
