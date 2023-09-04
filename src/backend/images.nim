@@ -2,6 +2,7 @@ import ../settings
 import std/[
     strutils, sugar
 ]
+import ./validation as validate
 
 # db stuff, change for 2.0.0
 import std/db_sqlite
@@ -231,16 +232,21 @@ proc buildSearchQuery*(
 
 # TODO: prone to SQL injection
 proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, ValueError].} =
+
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
     result = @[]
 
-    # need keyword sanitization
-    for row in db.instantRows(
-        sql("Select tag, count From tags Where tag Like \"%" & keyword & "%\" Order By tag Asc"),
-        keyword
-    ):
-        result.add(
-            (tag: row[0], count: row[1].parseInt())
-        )
+    try:
+        let kw = validate.sanitizeKeyword(keyword)
+        # need keyword sanitization
+        for row in db.instantRows(
+            sql("Select tag, count From tags Where tag Like \"%" & kw & "%\" Order By tag Asc")
+        ):
+            result.add(
+                (tag: row[0], count: row[1].parseInt())
+            )
+    except ValidationError:
+        debugEcho "keyword invalid: " & keyword
+        return result

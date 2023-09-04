@@ -77,18 +77,20 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises:
 proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
-        query = try:
-            validate.sanitizeQuery(paramTuple.query)
-        except ValueError as e:
-            debugEcho repr e
-            ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
-        imgSqlQuery = images.buildSearchQuery(query)
-        numPages = ceilDiv(
-            images.getCountOfQuery(imgSqlQuery),
-            numResults
-        )
+    var
+        query = ""
+        imageList: seq[ImageEntryRef] = @[]
+    try:
+        if paramTuple.query.strip() != "":
+            query = validate.sanitizeQuery(paramTuple.query)
+        let
+            imgSqlQuery = images.buildSearchQuery(query)
+            numPages = ceilDiv(
+                images.getCountOfQuery(imgSqlQuery),
+                numResults
+            )
         imageList = images.getQueried(
             images.buildPageQuery(
                 imgSqlQuery,
@@ -96,6 +98,8 @@ proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueE
                 descending=true
             )
         )
+    except ValueError as e:
+        debugEcho "getImageTags: invalid query: " & paramTuple.query
 
     var totalTags: seq[TagTuple] = @[]
 
@@ -205,14 +209,16 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises:
 proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
     let
         paramTuple = params.getVarsFromParams
-        query = try:
-            validate.sanitizeQuery(paramTuple.query)
-        except ValueError as e:
-            debugEcho repr e
-            ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
-        imgSqlQuery = images.buildSearchQuery(query)
+    var
+        query = ""
+        imageList: seq[ImageEntryRef] = @[]
+        numPages = 0
+    try:
+        if paramTuple.query.strip() != "":
+            query = validate.sanitizeQuery(paramTuple.query)
+        let imgSqlQuery = images.buildSearchQuery(query)
         numPages = ceilDiv(
             images.getCountOfQuery(imgSqlQuery),
             numResults
@@ -224,6 +230,8 @@ proc siteList*(params: Table): VNode  {.raises: [DbError, ValueError].} =
                 descending=true
             )
         )
+    except ValueError as e:
+        debugEcho "siteList: invalid query: " & paramTuple.query
 
     return buildHtml(main):
         tdiv(class="contentWithTags"):
