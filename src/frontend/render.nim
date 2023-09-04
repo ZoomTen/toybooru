@@ -357,7 +357,9 @@ proc masterTemplate*(title: string = "", params: Table, siteContent: VNode): str
                     siteHeader(query)
                     siteContent
                 footer:
-                    text "© 2023 Zumi"
+                    text "© 2023 Zumi. Source code is available "
+                    a(href=sourceLink): text "here"
+                    text "."
                 script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 

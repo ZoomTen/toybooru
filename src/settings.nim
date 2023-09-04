@@ -16,6 +16,8 @@ const
     thumbSize* = 250 # width or height, whichever's greater
     defaultNumResults* = 25
 
+    sourceLink* = "https://github.com/ZoomTen/toybooru"
+
 let mimeMappings* = {
         "image/jpeg": "jpg",
         "image/png": "png",
