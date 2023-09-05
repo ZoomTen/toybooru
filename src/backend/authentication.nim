@@ -242,22 +242,20 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
 
     if user[0] == "":
         errors.add(newException(LoginException, "(Username) or password invalid"))
-        return (
-            user: none(User),
-            errors: errors,
-            alreadyLoggedIn: false
-        )
     else:
         # user in db
         if not cryptoPwHashStrVerify(user[4], pw):
             errors.add(newException(LoginException, "Username or (password) invalid"))
-            return (
-                user: none(User),
-                errors: errors,
-                alreadyLoggedIn: false
-            )
+
+    if errors.len() == 0:
         return (
             user: some(userFromRow(user)),
+            errors: errors,
+            alreadyLoggedIn: false
+        )
+    else:
+        return (
+            user: none(User),
             errors: errors,
             alreadyLoggedIn: false
         )
