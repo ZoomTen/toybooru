@@ -140,7 +140,7 @@ proc setNewAcsrfToken*(sessId: string): string {.raises: [DbError].} =
     else:
         log.debug("Updated an ACSRF token", sessId=sessId, acsrfString=acsrfString)
         sessDb.exec(sql"Update session_acsrf Set token = ? Where sid = ?", acsrfString, sessId)
-        return acsrfString
+    return acsrfString
 
 proc verifyAcsrfToken*(sessId: string, acsrfToken: string) {.raises: [DbError, TokenException].} =
     let sessDb = open(sessionDbFile, "", "", "")
