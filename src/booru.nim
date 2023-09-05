@@ -16,11 +16,24 @@ import chronicles as log
 
 # exception handling not quite needed here
 
+template onlyWhenAuthenticated(user: Option[auth.User], body: untyped) =
+    if user.isNone():
+        resp Http403
+    else:
+        body
+
 router mainRouter:
     error Exception:
         setCookie(sessionCookieName, auth.getSessionIdFrom(request)) # throw cookie back at the client
         resp Http500, render.masterTemplate(
             siteContent=render.exception(exception),
+            rq=request
+        )
+
+    error Http403:
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        resp Http403, render.masterTemplate(
+            siteContent=render.`403`(),
             rq=request
         )
 
@@ -79,39 +92,48 @@ router mainRouter:
             resp Http404
         resp render.masterTemplate(
             siteContent=render.siteEntry(img,
-                query=render.getVarsFromParams(request.params).query
+                rq=request
             ),
             rq=request
         )
 
     get "/entry/@id/edit":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        var img: ImageEntryRef
-        try:
-            img = images.getQueried(
-                "Select * From images Where id = ?", $(@"id".parseInt)
-            )[0]
-        except:
-            resp Http404
-        resp render.masterTemplate(
-            siteContent=render.siteEntryEdit(img),
-            rq=request
-        )
+        let user = auth.getSessionIdFrom(request).getCurrentUser()
+
+        user.onlyWhenAuthenticated:
+            var img: ImageEntryRef
+            try:
+                img = images.getQueried(
+                    "Select * From images Where id = ?", $(@"id".parseInt)
+                )[0]
+            except:
+                resp Http404
+            resp render.masterTemplate(
+                siteContent=render.siteEntryEdit(img),
+                rq=request
+            )
 
     post "/entry/@id/edit":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let
-            inImageId = (@"id").parseInt
-            newImageTags = request.params.getOrDefault("tags")
-        upload.clearTags(inImageId)
-        upload.assignTags(inImageId, newImageTags)
-        redirect "/entry/" & @"id"
+        let user = auth.getSessionIdFrom(request).getCurrentUser()
+
+        user.onlyWhenAuthenticated:
+            let
+                inImageId = (@"id").parseInt
+                newImageTags = request.params.getOrDefault("tags")
+            upload.clearTags(inImageId)
+            upload.assignTags(inImageId, newImageTags)
+            redirect "/entry/" & @"id"
 
     get "/entry/@id/delete": # loooooooooooooool
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let inImageId = (@"id").parseInt
-        upload.deleteImage(inImageId)
-        redirect "/list"
+        let user = auth.getSessionIdFrom(request).getCurrentUser()
+
+        user.onlyWhenAuthenticated:
+            let inImageId = (@"id").parseInt
+            upload.deleteImage(inImageId)
+            redirect "/list"
 
     get "/wiki":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
@@ -122,19 +144,22 @@ router mainRouter:
 
     post "/upload":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        # don't upload large files or shit will hit the fan
-        if not request.formData.hasKey("tags"):
-            raise newException(BooruException, "No tags defined?")
-        if not request.formData.hasKey("data"):
-            raise newException(BooruException, "No image sent?")
+        let user = auth.getSessionIdFrom(request).getCurrentUser()
 
-        let rawTags = request.formData["tags"].body
+        user.onlyWhenAuthenticated:
+            # don't upload large files or shit will hit the fan
+            if not request.formData.hasKey("tags"):
+                raise newException(BooruException, "No tags defined?")
+            if not request.formData.hasKey("data"):
+                raise newException(BooruException, "No image sent?")
 
-        upload.processFile(
-            upload.fileFromReq(request.formData["data"]),
-            rawTags
-        )
-        redirect "/list"
+            let rawTags = request.formData["tags"].body
+
+            upload.processFile(
+                upload.fileFromReq(request.formData["data"]),
+                rawTags
+            )
+            redirect "/list"
 
     get "/autocomplete/@word":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))

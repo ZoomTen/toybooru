@@ -237,7 +237,7 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
 
     let
         params = rq.params
-        paramTuple = params.getVarsFromParams
+        paramTuple = params.getVarsFromParams()
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
     var
@@ -307,8 +307,9 @@ proc siteUntagged*(params: Table): VNode {.raises: [DbError, ValueError].} =
                     imageList.buildGallery(query)
                     numPages.buildGalleryPagination(pageNum, numResults, query)
 
-proc siteEntry*(img: ImageEntryRef, query: string): VNode {.raises: [DbError, KeyError, ValueError].} =
+proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyError, ValueError, IOSelectorsException, Exception].} =
     let
+        paramTuple = rq.params.getVarsFromParams()
         ext = mimeMappings[img.formatMime]
         imgLink = "/images/" & img.hash & "." & ext
     return buildHtml(main):
@@ -333,15 +334,16 @@ proc siteEntry*(img: ImageEntryRef, query: string): VNode {.raises: [DbError, Ke
                     #     dt: text "Source"
                     #     dd:
                     #         a(href="#"): text "nowhere"
-                    tdiv:
-                        dt: text "Actions"
-                        dd:
-                            ul:
-                                li: a(href="/entry/$#/edit" % $img.id): text "Edit"
-                                li: a(href="/entry/$#/delete" % $img.id): text "Delete"
+                    if rq.getSessionIdFrom().getCurrentUser().isSome():
+                        tdiv:
+                            dt: text "Actions"
+                            dd:
+                                ul:
+                                    li: a(href="/entry/$#/edit" % $img.id): text "Edit"
+                                    li: a(href="/entry/$#/delete" % $img.id): text "Delete"
             section(id="tags"):
-                getImageTagsSidebar(img, query)
-                relatedContent(query)
+                getImageTagsSidebar(img, paramTuple.query)
+                relatedContent(paramTuple.query)
 
 proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
     return buildHtml(main):
@@ -441,8 +443,14 @@ proc exception*(exception: ref Exception): VNode =
 proc `404`*(): VNode =
     return buildHtml(main):
         section(id="wiki"):
-            h2: text "HTTP 404 Not Found"
+            h2: text "Not Found"
             p: text "The specified page is not found."
+
+proc `403`*(): VNode =
+    return buildHtml(main):
+        section(id="wiki"):
+            h2: text "Forbidden"
+            p: text "You don't have enough permissions to do this!"
 
 proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].}=
     let newToken = auth.setNewAcsrfToken(
