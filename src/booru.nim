@@ -98,8 +98,9 @@ router mainRouter:
         )
 
     get "/entry/@id/edit":
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let user = auth.getSessionIdFrom(request).getCurrentUser()
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
 
         user.onlyWhenAuthenticated:
             var img: ImageEntryRef
@@ -115,8 +116,9 @@ router mainRouter:
             )
 
     post "/entry/@id/edit":
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let user = auth.getSessionIdFrom(request).getCurrentUser()
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
 
         user.onlyWhenAuthenticated:
             let
@@ -127,8 +129,9 @@ router mainRouter:
             redirect "/entry/" & @"id"
 
     get "/entry/@id/delete": # loooooooooooooool
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let user = auth.getSessionIdFrom(request).getCurrentUser()
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
 
         user.onlyWhenAuthenticated:
             let inImageId = (@"id").parseInt
@@ -143,8 +146,9 @@ router mainRouter:
         )
 
     post "/upload":
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        let user = auth.getSessionIdFrom(request).getCurrentUser()
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
 
         user.onlyWhenAuthenticated:
             # don't upload large files or shit will hit the fan
@@ -214,8 +218,9 @@ router mainRouter:
             )
 
     get "/logout": # loooooooooooooooool
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        auth.getSessionIdFrom(request).logOut()
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        sessId.logOut()
         redirect "/"
 
 
