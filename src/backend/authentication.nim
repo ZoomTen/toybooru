@@ -241,10 +241,12 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     let user = userDb.getRow(sql"Select id, username, joined_on, logged_in, password From users Where username = ?", uname)
 
     if user[0] == "":
+        log.debug("Username not found", name=uname)
         errors.add(newException(LoginException, "Username or password invalid"))
     else:
         # user in db
         if not cryptoPwHashStrVerify(user[4], pw):
+            log.debug("Password incorrect", name=uname)
             errors.add(newException(LoginException, "Username or password invalid"))
 
     if errors.len() == 0:
