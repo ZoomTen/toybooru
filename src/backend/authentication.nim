@@ -9,6 +9,7 @@ import chronicles as log
 import libsodium/[sodium, sodium_sizes]
 import ../settings
 import ./exceptions
+import ./validation
 
 import std/db_sqlite
 
@@ -161,11 +162,18 @@ proc processSignUp*(req: Request): tuple[user: Option[User], password: string, e
         sessId.verifyAcsrfToken(req.params.getOrDefault(antiCsrfFieldName, ""))
     except TokenException as e:
         errors.add(e)
+    var
+        rqUsername = req.params.getOrDefault(usernameFieldName, "")
     let
-        # TODO: validate username
-        rqUsername = req.params.getOrDefault(usernameFieldName, "").strip()
         rqPassword = req.params.getOrDefault(passwordFieldName, "")
         rqConfirmPassword = req.params.getOrDefault(confirmPasswordFieldName, "")
+
+    try:
+        rqUsername = rqUsername.sanitizeUsername()
+    except ValidationError:
+        errors.add(
+            newException(LoginException, "Invalid username!")
+        )
     if rqUsername == "":
         errors.add(
             newException(LoginException, "Username missing!")
@@ -183,7 +191,7 @@ proc processSignUp*(req: Request): tuple[user: Option[User], password: string, e
         errors.add(
             newException(LoginException, "Passwords do not match!")
         )
-    let user = if errors.len() > 0:
+    let user = if errors.len() != 0:
         none(User)
     else:
         some(
@@ -211,11 +219,13 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     log.logScope:
         topics = "processLogIn"
 
-    let isUser = getSessionIdFrom(req).getCurrentUser()
-    if isUser.isSome():
-        log.debug("User already logged in", user=isUser.get().name)
+    const genericUnameOrPwInvalidMsg = "Username or password invalid"
+
+    let existingUser = getSessionIdFrom(req).getCurrentUser()
+    if existingUser.isSome():
+        log.debug("User already logged in", user=existingUser.get().name)
         # skip the login process
-        return (user: isUser, errors: @[], alreadyLoggedIn: true)
+        return (user: existingUser, errors: @[], alreadyLoggedIn: true)
 
     let
         sessionDb = open(sessionDbFile, "", "", "")
@@ -233,34 +243,38 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     except TokenException as e:
         errors.add(e)
 
-    let
-        # TODO: validate username
-        uname = req.params.getOrDefault(usernameFieldName, "").strip()
+    var
+        uname = req.params.getOrDefault(usernameFieldName, "")
         pw = req.params.getOrDefault(passwordFieldName, "")
 
-    let user = userDb.getRow(sql"Select id, username, joined_on, logged_in, password From users Where username = ?", uname)
+    let userData = userDb.getRow(sql"Select id, username, joined_on, logged_in, password From users Where username = ?", uname)
 
-    if user[0] == "":
-        log.debug("Username not found", name=uname)
-        errors.add(newException(LoginException, "Username or password invalid"))
-    else:
-        # user in db
-        if not cryptoPwHashStrVerify(user[4], pw):
-            log.debug("Password incorrect", name=uname)
-            errors.add(newException(LoginException, "Username or password invalid"))
+    block validate:
+        try:
+            uname = uname.sanitizeUsername()
+        except ValidationError:
+            log.debug("Invalid username", name=uname)
+            errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
+            break validate
+        if userData[0] == "":
+            log.debug("Username not found", name=uname)
+            errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
+        else:
+            # user in db
+            if not cryptoPwHashStrVerify(userData[4], pw):
+                log.debug("Password incorrect", name=uname)
+                errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
 
-    if errors.len() == 0:
-        return (
-            user: some(userFromRow(user)),
-            errors: errors,
-            alreadyLoggedIn: false
-        )
+    let user = if errors.len() == 0:
+        some(userFromRow(userData))
     else:
-        return (
-            user: none(User),
-            errors: errors,
-            alreadyLoggedIn: false
-        )
+        none(User)
+
+    return (
+        user: user,
+        errors: errors,
+        alreadyLoggedIn: false
+    )
 
 proc doLogIn*(sessId: string, user: User) {.raises: [DbError].}=
     log.logScope:

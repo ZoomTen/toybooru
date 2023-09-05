@@ -2,11 +2,9 @@ import std/[
     strutils
 ]
 import regex
+import ./exceptions
 
 {.push raises:[].}
-
-type
-    ValidationError* = object of ValueError
 
 const
     QuerySyntax = re2"""(?x)
@@ -18,8 +16,12 @@ const
         )+ # take multiple copies
     """
     KeywordSyntax = re2"""(?x)
-        ([a-z_]+:)?      # can have a category, limited charset
+        ([a-z_]+:)?       # can have a category, limited charset
         [a-z0-9_<>!\(\)]+ # supported characters
+    """
+
+    UsernameSyntax = re2"""(?x)
+        ([a-zA-Z_0-9]){1,15}
     """
 proc normalizeSpaces*(s: string): string {.raises: [ValueError].} =
     return s.replace(re2"\s+", " ")
@@ -34,4 +36,10 @@ proc sanitizeKeyword*(s: string): string {.raises: [ValidationError].} =
     result = s.strip()
     if not match(result, KeywordSyntax):
         raise newException(ValidationError, "Invalid keyword: " & s)
+    return result
+
+proc sanitizeUsername*(s: string): string {.raises: [ValidationError].} =
+    result = s.strip()
+    if not match(result, UsernameSyntax):
+        raise newException(ValidationError, "Invalid username: " & s)
     return result

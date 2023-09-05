@@ -3,6 +3,7 @@ import std/[
     strutils, sugar
 ]
 import ./validation as validate
+import ./exceptions
 
 # db stuff, change for 2.0.0
 import std/db_sqlite
