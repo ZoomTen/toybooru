@@ -167,9 +167,9 @@ router mainRouter:
 
     get "/autocomplete/@word":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
-        var j = %*{}
+        var j = %*[]
         for tagEntry in images.getTagAutocompletes(@"word"):
-            j[tagEntry.tag] = %(tagEntry.count)
+            j.add(%*{"t": tagEntry.tag, "c": tagEntry.count})
         resp $j, contentType="application/json"
 
     get "/login":
