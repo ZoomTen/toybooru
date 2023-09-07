@@ -85,6 +85,22 @@ proc userTable*() {.raises: [DbError].} =
 
     log.info("Initialized users table")
 
+proc userBlacklistsTable*() {.raises: [DbError].} =
+    log.logScope:
+        topics = "setup.userBlacklistsTable"
+
+    let db = open(dbFile, "", "", "")
+    defer: db.close()
+
+    db.exec(sql"""
+        Create Table If Not Exists user_blacklists (
+            user_id Integer Not Null Unique,
+            blacklist Text Not Null Default ?,
+            Foreign Key (user_id) References users(id) On Delete Cascade
+        )
+    """, defaultBlacklist)
+    log.info("Initialized user blacklists table")
+
 proc sessionTable*() {.raises: [DbError].} =
     log.logScope:
         topics = "setup.sessionTable"

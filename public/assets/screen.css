@@ -152,6 +152,11 @@ main h2:first-of-type {
 	width: 9em;
 }
 
+.formRow textarea {
+	width: 100%;
+	min-height: 5em;
+}
+
 #submitTagBox {
 	min-height: 12em;
 }

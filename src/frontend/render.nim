@@ -8,6 +8,7 @@ import std/[
 import ../backend/images as images
 import ../backend/validation as validate
 import ../backend/authentication as auth
+import ../backend/userConfig as config
 import ../settings
 
 import std/db_sqlite
@@ -19,11 +20,42 @@ import chronicles as log
 type
     PageVars* = tuple
         query: string ## contains raw query!
+        originalQuery: string
         pageNum: int
         numResults: int
 
-proc getVarsFromParams*(params: Table): PageVars =
-    result.query = params.getOrDefault("q")
+proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
+    log.logScope:
+        topics = "getVarsFromParams"
+
+    let blacklistDef = if user.isNone():
+        try:
+            log.debug("Default blacklist set",
+                    blacklist=defaultBlacklist
+            )
+            validate.sanitizeBlacklist(defaultBlacklist)
+        except ValueError:
+            ""
+    else:
+        try:
+            let blist = config.getBlacklistConfig(user.get())
+            log.debug("Custom blacklist set",
+                    blacklist=blist
+            )
+            validate.sanitizeBlacklist(blist)
+        except DbError:
+            ""
+        except ValueError:
+            ""
+
+    log.debug("Converted blacklist to query to be appended", blacklistDef=blacklistDef)
+
+    result.query = params.getOrDefault("q", "")
+
+    result.originalQuery = result.query
+
+    result.query = result.query & " " & blacklistDef
+
     result.pageNum = try:
             params.getOrDefault("page", "0").parseInt()
         except ValueError: 0
@@ -77,14 +109,16 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises:
                     tagEntry.toTagDisplay(query)
         a(href="/taglist"): text "View all tags"
 
-proc getImageTagsOfListSidebar*(params: Table): VNode {.raises: [DbError, ValueError].} =
+proc getImageTagsOfListSidebar*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
     log.logScope:
         topics = "getImageTagsOfListSidebar"
+
+    let params = rq.params
 
     log.debug("Get image tags to sidebar")
 
     let
-        paramTuple = params.getVarsFromParams
+        paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
     var
@@ -135,14 +169,14 @@ proc relatedContent(query: string = ""): VNode =
             li: a(href="/untagged"): text "View untagged posts"
 
 proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].} =
-    let (query, pageNum, numResults) = rq.params.getVarsFromParams()
     let user = auth.getSessionIdFrom(rq).getCurrentUser()
+    let (query, originalQuery, pageNum, numResults) = rq.params.getVarsFromParams(user)
     return buildHtml(header):
         nav(id="mainMenu"):
             tdiv(id="titleAndSearch"):
                 h1: text siteName
                 form(class="inputAndSubmit", action="/list", `method`="get"):
-                    input(type="search", name="q", autocomplete="off", placeholder="find some_tags", id="searchInput", value=query)
+                    input(type="search", name="q", autocomplete="off", placeholder="find some_tags", id="searchInput", value=originalQuery)
                     input(type="submit", value="Find")
                 hr: text ""
                 ul(class="hidden"):
@@ -158,7 +192,7 @@ proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].}
                 else:
                     li:
                         text "Hey, "
-                        bold: text user.get().name
+                        a(href="/config"): bold: text user.get().name
                     li:
                         a(href="/logout"): text "Log out"
                 li:
@@ -236,8 +270,9 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
     log.debug("Get images to gallery display")
 
     let
+        user = auth.getCurrentUser(auth.getSessionIdFrom(rq))
         params = rq.params
-        paramTuple = params.getVarsFromParams()
+        paramTuple = params.getVarsFromParams(user)
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
     var
@@ -272,15 +307,16 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
                     imageList.buildGallery(query)
                     numPages.buildGalleryPagination(pageNum, numResults, query)
             section(id="tags"):
-                if auth.getCurrentUser(auth.getSessionIdFrom(rq)).isSome():
+                if user.isSome():
                     uploadForm()
                 if imageList.len >= 1:
-                    getImageTagsOfListSidebar(params)
+                    getImageTagsOfListSidebar(rq)
                     relatedContent(query)
 
-proc siteUntagged*(params: Table): VNode {.raises: [DbError, ValueError].} =
+proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
     let
-        paramTuple = params.getVarsFromParams
+        params = rq.params
+        paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
         query = ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
@@ -309,7 +345,8 @@ proc siteUntagged*(params: Table): VNode {.raises: [DbError, ValueError].} =
 
 proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyError, ValueError, IOSelectorsException, Exception].} =
     let
-        paramTuple = rq.params.getVarsFromParams()
+        user = auth.getSessionIdFrom(rq).getCurrentUser()
+        paramTuple = rq.params.getVarsFromParams(user)
         ext = mimeMappings[img.formatMime]
         imgLink = "/images/" & img.hash & "." & ext
     return buildHtml(main):
@@ -334,7 +371,7 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                     #     dt: text "Source"
                     #     dd:
                     #         a(href="#"): text "nowhere"
-                    if rq.getSessionIdFrom().getCurrentUser().isSome():
+                    if user.isSome():
                         tdiv:
                             dt: text "Actions"
                             dd:
@@ -369,8 +406,10 @@ proc siteWiki*(): VNode =
             # TODO: markdown and RST conversion here
             p: text "Not available yet!"
 
-proc siteAllTags*(params: Table): VNode {.raises: [DbError, ValueError].} =
-    let (query, pageNum, numResults) = params.getVarsFromParams
+proc siteAllTags*(rq: Request): VNode {.raises: [DbError, ValueError, Exception].} =
+    let (query, originalQuery, pageNum, numResults) = rq.params.getVarsFromParams(
+        auth.getSessionIdFrom(rq).getCurrentUser()
+    )
     let tags = images.getAllTags()
     return buildHtml(main):
         section(id="wiki"):
@@ -510,3 +549,16 @@ proc signUpSuccess*(): VNode =
                 text "Now that you've signed up, how about you "
                 a(href="/login"): text "log in to it"
                 text " now?"
+
+proc configPage*(rq: Request): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].} =
+    let
+        user = auth.getSessionIdFrom(rq).getCurrentUser()
+        blist = config.getBlacklistConfig(user.get())
+    return buildHtml(main):
+        section(id="wiki"):
+            form(action="/config", `method`="post", class="formBox"):
+                h2: text "Configuration"
+                tdiv(class="formRow"):
+                    label(`for`=blacklistFieldName): text "Blacklist"
+                    textarea(id=blacklistFieldName, name=blacklistFieldName, placeholder="rating:questionable rating:explicit"): text blist
+                input(type="submit", value="Save")

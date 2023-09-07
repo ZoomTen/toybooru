@@ -55,7 +55,7 @@ proc invalidateExpiredSessions*() {.raises:[DbError].} =
 
     let numDeletedSessions = sessDb.execAffectedRows(
     sql"Delete From sessions Where (expires < ? and expires != 0)",
-        getTime().toUnix
+        getTime().toUnix()
     )
 
     if numDeletedSessions > 0:
@@ -210,10 +210,15 @@ proc doSignUp*(user: User, pw: string) {.raises: [DbError, SodiumError, ValueErr
 
     log.debug("Someone has signed up", userName=user.name)
 
-    mainDb.exec(sql"""
+    let userId = mainDb.tryInsertID(sql"""
         Insert Into users(username, password, joined_on)
         Values (?, ?, ?)
     """, user.name, pwHashed, user.joinedOn.toUnix())
+
+    if userId != -1: # add blacklist
+        mainDb.exec(sql"""
+            Insert Into user_blacklists(user_id) Values (?)
+        """, userId)
 
 proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception], alreadyLoggedIn: bool] {.raises: [DbError, ValueError, IOSelectorsException, SodiumError, Exception].}=
     log.logScope:

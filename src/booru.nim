@@ -7,6 +7,7 @@ import ./backend/upload as upload
 import ./backend/exceptions
 import ./backend/images as images
 import ./backend/authentication as auth
+import ./backend/userConfig as config
 
 import std/[
     strutils, json
@@ -58,21 +59,23 @@ router mainRouter:
     get "/untagged":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
-            siteContent=render.siteUntagged(request.params),
+            siteContent=render.siteUntagged(request),
             rq=request
         )
 
     get "/taglist":
         setCookie(sessionCookieName, auth.getSessionIdFrom(request))
         resp render.masterTemplate(
-            siteContent=render.siteAllTags(request.params),
+            siteContent=render.siteAllTags(request),
             rq=request
         )
 
     get "/random":
-        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
         if request.params.hasKey("q"):
-            let paramized = render.getVarsFromParams(request.params)
+            let paramized = render.getVarsFromParams(request.params, user)
             let randomImgId = images.getRandomIdFrom(
                 images.buildSearchQuery(paramized.query)
             )
@@ -223,6 +226,23 @@ router mainRouter:
         sessId.logOut()
         redirect "/"
 
+    get "/config":
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
+        user.onlyWhenAuthenticated:
+            resp render.masterTemplate(
+                siteContent=render.configPage(rq=request),
+                rq=request
+            )
+
+    post "/config":
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
+        user.onlyWhenAuthenticated:
+            config.processSetBlacklistConfig(user.get(), request)
+            redirect "/config"
 
 proc serverMain() =
     let settings = newSettings(bindAddr="127.0.0.1", numThreads=16, staticDir=pubDir)
@@ -262,6 +282,7 @@ when isMainModule:
     setup.imageTable()
     setup.tagTable()
     setup.userTable()
+    setup.userBlacklistsTable()
     setup.sessionTable()
     auth.invalidateExpiredSessions()
     serverMain()

@@ -30,6 +30,10 @@ const
     confirmPasswordFieldName* = "cfpw"
     antiCsrfFieldName* = "acsrf"
 
+# config stuffs
+    blacklistFieldName* = "bls"
+
+    defaultBlacklist* = "rating:questionable rating:explicit"
 
 let
     mimeMappings* = {
