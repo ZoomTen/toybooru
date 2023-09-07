@@ -260,7 +260,7 @@ proc buildSearchQuery*(
                     log.debug("Keyword not found", keyword=queryElement)
                     discard
 
-        if includes.len() == 0:
+        if includes.len() == 0 and excludes.len() == 0:
             # if there are no matches, just say so
             log.debug("No matches, returning empty query")
             return ""
