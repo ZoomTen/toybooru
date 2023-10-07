@@ -277,11 +277,14 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
         numResults = paramTuple.numResults
     var
         query = ""
+        userQuery = ""
         imageList: seq[ImageEntryRef] = @[]
         numPages = 0
     try:
         if paramTuple.query.strip() != "":
             query = validate.sanitizeQuery(paramTuple.query)
+        if paramTuple.originalQuery.strip() != "":
+            userQuery = validate.sanitizeQuery(paramTuple.originalQuery)
         let imgSqlQuery = images.buildSearchQuery(query)
         numPages = ceilDiv(
             images.getCountOfQuery(imgSqlQuery),
@@ -305,7 +308,7 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
                     span: text "Nothing here!"
                 else:
                     imageList.buildGallery(query)
-                    numPages.buildGalleryPagination(pageNum, numResults, query)
+                    numPages.buildGalleryPagination(pageNum, numResults, userQuery)
             section(id="tags"):
                 if user.isSome():
                     uploadForm()
