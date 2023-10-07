@@ -221,9 +221,14 @@ proc uploadForm(): VNode =
 
 proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): VNode =
     let appendParam = if numResults != defaultNumResults:
-            "&count=" & $numResults & "&q="
+            "&count=" & $numResults
         else:
-            "&q="
+            ""
+    
+    let queryParam = if query.strip() != "":
+            "&q=" & query
+        else:
+            ""
 
     return buildHtml(nav(id="pageNav")):
         h2(class="hidden"): text "Pages"
@@ -233,8 +238,8 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): 
                 li(aria-label="First"): text "<<"
                 li(aria-label="Prev"): text "<"
             else:
-                li: a(aria-label="First", href="?page=0" & appendParam & query): text "<<"
-                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & appendParam & query): text "<"
+                li: a(aria-label="First", href="?page=0" & appendParam & queryParam): text "<<"
+                li: a(aria-label="Prev", href="?page=" & $(pageNum-1) & appendParam & queryParam): text "<"
 
             # page numbers, show 2 pages around current page
             for i in 0..<numPages:
@@ -242,15 +247,15 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): 
                     if i == pageNum:
                         li: text $(i+1)
                     else:
-                        li: a(href="?page=" & $i & appendParam & query): text $(i+1)
+                        li: a(href="?page=" & $i & appendParam & queryParam): text $(i+1)
 
             # next/last
             if pageNum == numPages-1:
                 li(aria-label="Next"): text ">"
                 li(aria-label="Last"): text ">>"
             else:
-                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & query): text ">"
-                li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & query): text ">>"
+                li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & queryParam): text ">"
+                li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & queryParam): text ">>"
 
 proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises: [DbError, ValueError].} =
     return buildHtml(ul(class="galleryItems navLinks")):
