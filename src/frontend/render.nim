@@ -409,15 +409,31 @@ proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].
                 src="/images/" & img.hash & "." & mimeMappings[img.formatMime],
                 width="500"
             )
-            dl(id="imageInfo"):
-                form(class="headerBox", `method`="post"):
-                    tdiv(class="textAreaAndSubmit"):
-                        textarea(
-                            name="tags",
-                            placeholder="insert_tags_here",
-                            id="editTagBox"
-                        ): text images.tagsAsString(images.getTagsFor(img))
-                        input(type="submit", value="Post")
+            form(class="headerBox", `method`="post"):
+                tdiv(class="textAreaAndSubmit"):
+                    textarea(
+                        name="tags",
+                        placeholder="insert_tags_here",
+                        id="editTagBox"
+                    ): text images.tagsAsString(images.getTagsFor(img))
+                    input(type="submit", value="Post")
+
+proc siteEntryConfirmDelete*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
+    let mimeMappings = makeMimeMappings()
+    return buildHtml(main):
+        section(id="image"):
+            img(
+                src="/images/" & img.hash & "." & mimeMappings[img.formatMime],
+                width="400"
+            )
+            h2: text "Confirm deletion"
+            form(class="headerBox", `method`="post"):
+                tdiv(class="textAreaAndSubmit"):
+                    tdiv:
+                        text "Press the button to confirm deletion → "
+                        input(type="submit", value="Delete")
+                    span:
+                        text "Otherwise, click the Back button on your browser to cancel."
 
 proc siteWiki*(): VNode =
     return buildHtml(main):

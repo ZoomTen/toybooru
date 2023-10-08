@@ -137,6 +137,24 @@ router mainRouter:
         let user = sessId.getCurrentUser()
 
         user.onlyWhenAuthenticated:
+            var img: ImageEntryRef
+            try:
+                img = images.getQueried(
+                    "Select * From images Where id = ?", $(@"id".parseInt)
+                )[0]
+            except:
+                resp Http404
+            resp render.masterTemplate(
+                siteContent=render.siteEntryConfirmDelete(img),
+                rq=request
+            )
+
+    post "/entry/@id/delete":
+        let sessId = auth.getSessionIdFrom(request)
+        setCookie(sessionCookieName, sessId)
+        let user = sessId.getCurrentUser()
+
+        user.onlyWhenAuthenticated:
             let inImageId = (@"id").parseInt
             upload.deleteImage(inImageId)
             redirect "/list"
