@@ -425,14 +425,14 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                     #     dt: text "Source"
                     #     dd:
                     #         a(href="#"): text "nowhere"
-                    tdiv:
-                        dt: text "Actions"
-                        dd:
-                            ul:
-                                if user.isSome():
+                    if user.isSome():
+                        tdiv:
+                            dt: text "Actions"
+                            dd:
+                                ul:
                                     li: a(href="/entry/$#/edit" % $img.id): text "Edit"
                                     li: a(href="/entry/$#/delete" % $img.id): text "Delete"
-                                li: a(href="/entry/$#/similar" % $img.id): text "Find similar images"
+                                    li: a(href="/entry/$#/similar" % $img.id): text "Find similar images"
             section(id="tags"):
                 getImageTagsSidebar(img, paramTuple.originalQuery)
                 relatedContent(paramTuple.originalQuery)
