@@ -61,8 +61,8 @@ proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
     result.query = result.query & " " & blacklistDef
 
     result.distance = try: # Hamming distance
-            params.getOrDefault("distance", "24").parseInt()
-        except ValueError: 24
+            params.getOrDefault("distance", "8").parseInt()
+        except ValueError: 8
 
     result.pageNum = try:
             params.getOrDefault("page", "0").parseInt()
