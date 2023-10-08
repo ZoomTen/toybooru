@@ -17,7 +17,7 @@ Clean the database by
 nimble cleanDb
 ```
 
-**Requires SQLite ≥ 3.39.0, libsodium**
+**Requires devel packages for: SQLite ≥ 3.39.0, libsodium**
 
 ## What's here?
 
@@ -29,6 +29,7 @@ nimble cleanDb
 - Responsive layout
 - Rolling a random picture. Will also be limited to a subset of pictures provided you have an existing tag search query (GET parameter: `q`)
 - Utility for importing from [Hydrus Network](https://hydrusnetwork.github.io/hydrus/)… provided you've exported with tags to a corresponding text file.
+- Find similar images
 
 ## Todo
 
