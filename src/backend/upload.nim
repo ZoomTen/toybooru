@@ -5,6 +5,7 @@ import ../stb/resize as stbz
 import ../settings
 import ./exceptions
 import ./validation as validate
+import chronicles as log
 
 import std/[tables, strutils, os, osproc, sequtils]
 
@@ -51,6 +52,8 @@ proc refreshTagCounts*() {.raises:[DbError].} =
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
 proc assignTags*(imageId: int, t: string) {.raises:[DbError, BooruException].} =
+    log.logScope:
+        topics = "upload.assignTags"
     var tags = ""
 
     try:
@@ -96,6 +99,7 @@ proc assignTags*(imageId: int, t: string) {.raises:[DbError, BooruException].} =
             Insert Into image_tags (image_id, tag_id) Values (?, ?)
         """, imageId, tagRowId)
 
+    log.info("Assigned tags to image", imgId=imageId, tags=t)
     refreshTagCounts()
 
 proc genThumbSize(width, height: int): array[0..1, int] =
@@ -108,6 +112,8 @@ proc genThumbSize(width, height: int): array[0..1, int] =
 proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     BooruException, STBIException, IOError, OSError, Exception
 ].} =
+    log.logScope:
+        topics = "upload.processFile"
     let mimeMappings = makeMimeMappings()
     let db = open(dbFile, "", "", "")
 
@@ -189,9 +195,13 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
 
     db.close()
 
+    log.info("Added new image", imgId=imageId)
     imageId.int.assignTags(tags)
 
 proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyError].} =
+    log.logScope:
+        topics = "upload.deleteImage"
+
     let mimeMappings = makeMimeMappings()
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -206,5 +216,6 @@ proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyE
         # then delete it from the db
         db.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
         db.exec(sql"Delete From images Where id = ?", $imageId)
+        log.info("Image deleted", imgId=imageId)
     else:
         raise newException(BooruException, "Invalid image")
