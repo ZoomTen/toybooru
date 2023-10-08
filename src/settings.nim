@@ -2,6 +2,8 @@ import std/[tables, times]
 
 const
     siteName* = "toybooru"
+    siteRevDate* = staticExec("git show -s --format='%cd' --date=format:'%Y-%m-%d'")
+    siteRevHash* = staticExec("git show -s --format='%h'")
 
 # relative to site
     imgSuffix* = "/images"

@@ -452,6 +452,8 @@ proc masterTemplate*(title: string = "", rq: Request, siteContent: VNode): strin
                     text "© 2023 Zumi. Source code is available "
                     a(href=sourceLink): text "here"
                     text "."
+                    br: discard
+                    text "ver. " & siteRevHash & " (" & siteRevDate & ")"
                 script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 
@@ -475,6 +477,8 @@ proc landingPage*(rq: Request): string {.raises: [ValueError, DbError, IOSelecto
                     text "© 2023 Zumi. Source code is available "
                     a(href=sourceLink): text "here"
                     text "."
+                    br: discard
+                    text "ver. " & siteRevHash & " (" & siteRevDate & ")"
                 script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 
