@@ -18,6 +18,9 @@ else:
 
 import chronicles as log
 
+import packages/docutils/rst as rst
+import packages/docutils/rstgen as rstgen
+
 {.push raises: [].}
 
 type
@@ -437,7 +440,7 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                 getImageTagsSidebar(img, paramTuple.originalQuery)
                 relatedContent(paramTuple.originalQuery)
 
-proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
+proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError, Exception].} =
     let mimeMappings = makeMimeMappings()
     return buildHtml(main):
         section(id="image"):
@@ -453,6 +456,18 @@ proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].
                         id="editTagBox"
                     ): text images.tagsAsString(images.getTagsFor(img))
                     input(type="submit", value="Post")
+            tdiv:
+                h2: text "Quick tagging guide"
+                verbatim rstgen.rstToHtml("""
+* **Info** - `author:*`, `character_owner:*`, `character:*`, for each character that shows up.
+* **Rating** - `rating`: `safe`, `questionable` or `explicit`.
+* **Videos** - use `meta:animated`. If sound is present, add `meta:sound`. Could also add `meta:mp4`/`meta:gif`/`meta:webm`, ...
+* **Composition** - `1female`, `1male`, `2female`, ...
+* **Clothing**
+* **Actions**
+* **Body/face features**
+* **Tag-what-else-you-see!** Favor more frequent tags.
+""", {rst.roSupportMarkdown, rst.roPreferMarkdown}, newStringTable(modeStyleInsensitive))
 
 proc siteEntryConfirmDelete*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
     let mimeMappings = makeMimeMappings()
