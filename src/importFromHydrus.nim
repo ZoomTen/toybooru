@@ -3,6 +3,7 @@ import ./backend/upload as upload
 import std/[
     os, mimetypes, strutils, sugar
 ]
+import ./settings
 
 {.push raises: [].}
 

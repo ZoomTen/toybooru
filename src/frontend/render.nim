@@ -11,7 +11,10 @@ import ../backend/authentication as auth
 import ../backend/userConfig as config
 import ../settings
 
-import std/db_sqlite
+when NimMajor > 1:
+    import db_connector/db_sqlite
+else:
+    import std/db_sqlite
 
 import chronicles as log
 
@@ -352,6 +355,7 @@ proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelecto
                     numPages.buildGalleryPagination(pageNum, numResults, query)
 
 proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyError, ValueError, IOSelectorsException, Exception].} =
+    let mimeMappings = makeMimeMappings()
     let
         user = auth.getSessionIdFrom(rq).getCurrentUser()
         paramTuple = rq.params.getVarsFromParams(user)
@@ -391,6 +395,7 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                 relatedContent(paramTuple.query)
 
 proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
+    let mimeMappings = makeMimeMappings()
     return buildHtml(main):
         section(id="image"):
             img(

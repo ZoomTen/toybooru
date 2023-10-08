@@ -6,10 +6,14 @@ import ../settings
 import ./exceptions
 import ./validation as validate
 
-import std/[md5, tables, strutils, os, osproc, sequtils]
+import std/[tables, strutils, os, osproc, sequtils]
 
-# db stuff, change for 2.0.0
-import std/db_sqlite
+when NimMajor > 1:
+    import db_connector/db_sqlite
+    import checksums/md5
+else:
+    import std/md5
+    import std/db_sqlite
 
 {.push raises:[].}
 
@@ -104,6 +108,7 @@ proc genThumbSize(width, height: int): array[0..1, int] =
 proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     BooruException, STBIException, IOError, OSError, Exception
 ].} =
+    let mimeMappings = makeMimeMappings()
     let db = open(dbFile, "", "", "")
 
     let hash = getMD5(file.contents)
@@ -187,6 +192,7 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     imageId.int.assignTags(tags)
 
 proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyError].} =
+    let mimeMappings = makeMimeMappings()
     let db = open(dbFile, "", "", "")
     defer: db.close()
     let row = db.getRow(sql"Select hash, format From images Where id = ?", $imageId)

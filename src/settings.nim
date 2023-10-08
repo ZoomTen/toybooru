@@ -35,10 +35,12 @@ const
 
     defaultBlacklist* = "rating:questionable rating:explicit"
 
-let
-    mimeMappings* = {
+proc makeMimeMappings*(): Table[string, string] =
+    return {
         "image/jpeg": "jpg",
         "image/png": "png",
         "video/mp4": "mp4"
     }.toTable
+
+let
     defaultSessionExpirationTime* = 30.minutes()

@@ -10,7 +10,7 @@ bin           = @["booru", "importFromHydrus"]
 
 # Dependencies
 
-requires "nim 1.6.14..<2.0.0"
+requires "nim >= 1.6.14"
 
 # Server dependencies
 
@@ -20,6 +20,10 @@ requires [
     "stbimage#ba5f4528",
     "regex#199e696"
 ]
+
+if NimMajor > 1:
+    requires "db_connector#e656937"
+    requires "checksums#025bcca"
 
 # Debug dependencies
 
@@ -46,4 +50,4 @@ task clean, "Clean generated files":
         rmFile(binName & ".exe")
 
 task start, "Run server":
-    exec("nimble -d:chronicles_disabled_topics:\"stdlib\" run booru")
+    exec("nimble -d:chronicles_disabled_topics:\"stdlib\" --threads:off run booru")

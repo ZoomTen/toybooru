@@ -6,7 +6,10 @@ import std/[
 import ../settings
 import chronicles as log
 
-import std/db_sqlite
+when NimMajor > 1:
+    import db_connector/db_sqlite
+else:
+    import std/db_sqlite
 
 {.push raises:[].}
 
