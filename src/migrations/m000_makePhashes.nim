@@ -35,19 +35,20 @@ when isMainModule:
                 hash = row[1]
                 extension = mimeMappings[row[2]]
                 file = imgDir & "/" & hash & "." & extension
-            log.info(
-                "Processing image",
-                id = id,
-                file = file
-            )
-            let phash = phash.pHash(file.readFile())
-            db.exec(sql"""
-                Insert Into image_phashes (image_id, phash) Values (?, ?)
-            """, id, phash)
-            log.info(
-                "Success",
-                pHash = phash
-            )
+            if not (extension in ["mp4"]):
+                log.info(
+                    "Processing image",
+                    id = id,
+                    file = file
+                )
+                let phash = phash.pHash(file.readFile())
+                db.exec(sql"""
+                    Insert Into image_phashes (image_id, phash) Values (?, ?)
+                """, id, phash)
+                log.info(
+                    "Success",
+                    pHash = phash
+                )
 
 
     else:
