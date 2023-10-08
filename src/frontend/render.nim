@@ -126,10 +126,13 @@ proc getImageTagsOfListSidebar*(rq: Request): VNode {.raises: [DbError, ValueErr
         numResults = paramTuple.numResults
     var
         query = ""
+        userQuery = ""
         imageList: seq[ImageEntryRef] = @[]
     try:
         if paramTuple.query.strip() != "":
             query = validate.sanitizeQuery(paramTuple.query)
+        if paramTuple.originalQuery.strip() != "":
+            userQuery = validate.sanitizeQuery(paramTuple.originalQuery)
         let
             imgSqlQuery = images.buildSearchQuery(query)
             numPages = ceilDiv(
@@ -158,7 +161,7 @@ proc getImageTagsOfListSidebar*(rq: Request): VNode {.raises: [DbError, ValueErr
         h2: text "Tags for images in list"
         ul(id="navTags", class="navLinks"):
             for tagEntry in totalTags:
-                tagEntry.toTagDisplay(query)
+                tagEntry.toTagDisplay(userQuery)
         a(href="/taglist"): text "View all tags"
 
 proc relatedContent(query: string = ""): VNode =
@@ -261,10 +264,13 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): 
                 li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & queryParam): text ">>"
 
 proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises: [DbError, ValueError].} =
+    let queryAddition = if query.strip() != "":
+                "?q=" & query
+            else: ""
     return buildHtml(ul(class="galleryItems navLinks")):
         for img in imageList:
             li:
-                a(href="/entry/" & $img.id & "?q="&query): img(
+                a(href="/entry/" & $img.id & queryAddition): img(
                         src="/thumbs/" & img.hash & ".jpg",
                         title=images.tagsAsString(
                             images.getTagsFor(img)
@@ -315,14 +321,14 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
                 if imageList.len < 1:
                     span: text "Nothing here!"
                 else:
-                    imageList.buildGallery(query)
+                    imageList.buildGallery(userQuery)
                     numPages.buildGalleryPagination(pageNum, numResults, userQuery)
             section(id="tags"):
                 if user.isSome():
                     uploadForm()
                 if imageList.len >= 1:
                     getImageTagsOfListSidebar(rq)
-                    relatedContent(query)
+                    relatedContent(userQuery)
 
 proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
     let
@@ -391,8 +397,8 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                                     li: a(href="/entry/$#/edit" % $img.id): text "Edit"
                                     li: a(href="/entry/$#/delete" % $img.id): text "Delete"
             section(id="tags"):
-                getImageTagsSidebar(img, paramTuple.query)
-                relatedContent(paramTuple.query)
+                getImageTagsSidebar(img, paramTuple.originalQuery)
+                relatedContent(paramTuple.originalQuery)
 
 proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
     let mimeMappings = makeMimeMappings()
