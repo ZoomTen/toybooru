@@ -3,9 +3,6 @@ import ../stb/resize as stbz
 import arraymancer as mancer
 import ../helpers/fft
 import std/sequtils, std/sugar
-import ../settings
-import std/strutils
-import chronicles as log
 
 proc pHash*(imageFileContents: string): BiggestInt =
     result = 0
