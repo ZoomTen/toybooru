@@ -5,7 +5,9 @@ author        = "Zumi Daxuya"
 description   = "Booru-like web engine"
 license       = "MIT"
 srcDir        = "src"
-bin           = @["booru", "importFromHydrus"]
+bin           = @["booru", "importFromHydrus",
+                    "migrations/m000_makePhashes"
+                 ]
 
 
 # Dependencies
@@ -37,6 +39,12 @@ requires [
     "libsodium#881f3ae"
 ]
 
+# Hash dependencies
+
+requires [
+    "arraymancer#86f930d"
+]
+
 task cleanDb, "Clean database and image files":
     rmDir("public/images")
     rmDir("public/thumbs")
@@ -50,4 +58,5 @@ task clean, "Clean generated files":
         rmFile(binName & ".exe")
 
 task start, "Run server":
+    exec("gcc -shared -fPIC -O3 -o popcount src/sqliteExt/popcount.c")
     exec("nimble -d:chronicles_disabled_topics:\"stdlib\" --threads:off run booru")

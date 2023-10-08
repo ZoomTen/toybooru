@@ -103,6 +103,22 @@ proc userBlacklistsTable*() {.raises: [DbError].} =
     """, defaultBlacklist)
     log.info("Initialized user blacklists table")
 
+proc imagePhashesTable*() {.raises: [DbError].} =
+    log.logScope:
+        topics = "setup.imagePhashesTable"
+
+    let db = open(dbFile, "", "", "")
+    defer: db.close()
+
+    db.exec(sql"""
+        Create Table If Not Exists image_phashes (
+            image_id Integer Not Null Unique,
+            phash Integer Not Null,
+            Foreign Key (image_id) References images(id) On Delete Cascade
+        )
+    """)
+    log.info("Initialized image perceptual hashes table")
+
 proc sessionTable*() {.raises: [DbError].} =
     log.logScope:
         topics = "setup.sessionTable"

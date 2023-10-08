@@ -22,10 +22,11 @@ import chronicles as log
 
 type
     PageVars* = tuple
-        query: string ## contains raw query!
-        originalQuery: string
+        query: string ## final query
+        originalQuery: string ## contains raw query!
         pageNum: int
         numResults: int
+        distance: int
 
 proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
     log.logScope:
@@ -58,6 +59,10 @@ proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
     result.originalQuery = result.query
 
     result.query = result.query & " " & blacklistDef
+
+    result.distance = try: # Hamming distance
+            params.getOrDefault("distance", "24").parseInt()
+        except ValueError: 24
 
     result.pageNum = try:
             params.getOrDefault("page", "0").parseInt()
@@ -177,7 +182,7 @@ proc relatedContent(query: string = "", shouldShowRandomPics: bool = true): VNod
 
 proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].} =
     let user = auth.getSessionIdFrom(rq).getCurrentUser()
-    let (query, originalQuery, pageNum, numResults) = rq.params.getVarsFromParams(user)
+    let (query, originalQuery, pageNum, numResults, distance) = rq.params.getVarsFromParams(user)
     return buildHtml(header):
         nav(id="mainMenu"):
             tdiv(id="titleAndSearch"):
@@ -226,7 +231,7 @@ proc uploadForm(): VNode =
                 )
                 input(type="submit")
 
-proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): VNode =
+proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string = ""): VNode =
     let appendParam = if numResults != defaultNumResults:
             "&count=" & $numResults
         else:
@@ -264,7 +269,7 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string): 
                 li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & queryParam): text ">"
                 li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & queryParam): text ">>"
 
-proc buildGallery(imageList: seq[ImageEntryRef], query: string): VNode {.raises: [DbError, ValueError].} =
+proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode {.raises: [DbError, ValueError].} =
     let queryAddition = if query.strip() != "":
                 "?q=" & query
             else: ""
@@ -335,7 +340,6 @@ proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelecto
     let
         params = rq.params
         paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
-        query = ""
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
         imgSqlQuery = "Select * From images Where id Not In (Select image_id From image_tags)"
@@ -358,8 +362,39 @@ proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelecto
                 if imageList.len < 1:
                     span: text "No untagged posts :)"
                 else:
-                    imageList.buildGallery(query)
-                    numPages.buildGalleryPagination(pageNum, numResults, query)
+                    imageList.buildGallery()
+                    numPages.buildGalleryPagination(pageNum, numResults)
+
+proc siteSimilar*(rq: Request, img: images.ImageEntryRef): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
+    let
+        params = rq.params
+        paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
+        maxDistance = paramTuple.distance
+        pageNum = paramTuple.pageNum
+        numResults = paramTuple.numResults
+        imgSqlQuery = images.buildImageSimilarityQuery(img, maxDistance)
+        numPages = ceilDiv(
+            images.getCountOfQuery(imgSqlQuery),
+            numResults
+        )
+        imageList = images.getQueried(
+            images.buildPageQuery(
+                imgSqlQuery,
+                pageNum=pageNum, numResults=numResults,
+                descending=true
+            )
+        )
+
+    return buildHtml(main):
+        tdiv(class="contentWithTags"):
+            section(id="gallery"):
+                h2: text "Similar images (max distance = " & $maxDistance & ")"
+                form(`method`="get", class="formSingleEntry"):
+                    label(`for`="distanceSpinbox"): text "Try again with distance"
+                    input(id="distanceSpinbox", name="distance", type="number", min="0", max="64", value = $(maxDistance)): discard
+                    input(type="submit")
+                imageList.buildGallery()
+                numPages.buildGalleryPagination(pageNum, numResults)
 
 proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyError, ValueError, IOSelectorsException, Exception].} =
     let mimeMappings = makeMimeMappings()
@@ -390,13 +425,14 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                     #     dt: text "Source"
                     #     dd:
                     #         a(href="#"): text "nowhere"
-                    if user.isSome():
-                        tdiv:
-                            dt: text "Actions"
-                            dd:
-                                ul:
+                    tdiv:
+                        dt: text "Actions"
+                        dd:
+                            ul:
+                                if user.isSome():
                                     li: a(href="/entry/$#/edit" % $img.id): text "Edit"
                                     li: a(href="/entry/$#/delete" % $img.id): text "Delete"
+                                li: a(href="/entry/$#/similar" % $img.id): text "Find similar images"
             section(id="tags"):
                 getImageTagsSidebar(img, paramTuple.originalQuery)
                 relatedContent(paramTuple.originalQuery)
@@ -443,7 +479,7 @@ proc siteWiki*(): VNode =
             p: text "Not available yet!"
 
 proc siteAllTags*(rq: Request): VNode {.raises: [DbError, ValueError, Exception].} =
-    let (query, originalQuery, pageNum, numResults) = rq.params.getVarsFromParams(
+    let (query, originalQuery, pageNum, numResults, distance) = rq.params.getVarsFromParams(
         auth.getSessionIdFrom(rq).getCurrentUser()
     )
     let tags = images.getAllTags()

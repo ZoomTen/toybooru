@@ -16,6 +16,8 @@ else:
     import std/md5
     import std/db_sqlite
 
+import ./pHashes as phash
+
 {.push raises:[].}
 
 type
@@ -128,70 +130,76 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
         raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png, mp4.")
 
     let hashExists = db.getValue(sql"Select id From images Where hash = ?", hash)
+
     if hashExists != "":
         raise newException(BooruException, "An image with this hash already exists: " & hashExists)
-    else:
-        var
-            width = 0
-            height = 0
 
-        block saveImageAndThumbnail:
+    var
+        width = 0
+        height = 0
+
+    block saveImageAndThumbnail:
+        let
+            exportName = imgDir & "/" & hash & "." & extension
+            thumbName = thumbDir & "/" & hash & ".jpg"
+        # copy uploaded file
+        writeFile(
+            exportName,
+            file.contents
+        )
+        # make thumbnail
+        if extension in ["mp4"]:
             let
-                exportName = imgDir & "/" & hash & "." & extension
-                thumbName = thumbDir & "/" & hash & ".jpg"
-            # copy uploaded file
-            writeFile(
-                exportName,
-                file.contents
+                ffprobe = findExe("ffprobe")
+                ffmpeg = findExe("ffmpeg")
+            if ffprobe == "" or ffmpeg == "":
+                raise newException(BooruException, "This server doesn't support video files :(")
+            # https://stackoverflow.com/a/29585066
+            var (wh, ex) = execCmdEx(
+                ffprobe & " -v quiet -select_streams v -show_entries stream=width,height -of csv=p=0:s=x " & exportName
             )
-            # make thumbnail
-            if extension in ["mp4"]:
-                let
-                    ffprobe = findExe("ffprobe")
-                    ffmpeg = findExe("ffmpeg")
-                if ffprobe == "" or ffmpeg == "":
-                    raise newException(BooruException, "This server doesn't support video files :(")
-                # https://stackoverflow.com/a/29585066
-                var (wh, ex) = execCmdEx(
-                    ffprobe & " -v quiet -select_streams v -show_entries stream=width,height -of csv=p=0:s=x " & exportName
-                )
-                if ex != 0:
-                    raise newException(BooruException, "Error processing video!")
-                let
-                    whx = wh.split("x")
-                    width = whx[0].strip().parseInt()
-                    height = whx[1].strip().parseInt()
-                    genThumbSize = genThumbSize(width, height)
+            if ex != 0:
+                raise newException(BooruException, "Error processing video!")
+            let
+                whx = wh.split("x")
+                width = whx[0].strip().parseInt()
+                height = whx[1].strip().parseInt()
+                genThumbSize = genThumbSize(width, height)
 
-                (wh, ex) = execCmdEx(
-                    ffmpeg & " -i " & exportName & " -ss 0 -vframes 1 -s " &
-                    $genThumbSize[0] & "x" & $genThumbSize[1] & " -y " & thumbName
-                )
+            (wh, ex) = execCmdEx(
+                ffmpeg & " -i " & exportName & " -ss 0 -vframes 1 -s " &
+                $genThumbSize[0] & "x" & $genThumbSize[1] & " -y " & thumbName
+            )
 
-            else:
-                var
-                    channels: int
-                    imgData, imgThumb: seq[uint8]
+        else:
+            var
+                channels: int
+                imgData, imgThumb: seq[uint8]
 
-                imgData = stbr.loadFromMemory(
-                    cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
-                )
+            imgData = stbr.loadFromMemory(
+                cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
+            )
 
-                # calculate thumbsize
-                let genThumbSize = genThumbSize(width, height)
+            # calculate thumbsize
+            let genThumbSize = genThumbSize(width, height)
 
-                imgThumb = stbz.resize(
-                    imgData, width, height, genThumbSize[0], genThumbSize[1], channels
-                )
-                stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
+            imgThumb = stbz.resize(
+                imgData, width, height, genThumbSize[0], genThumbSize[1], channels
+            )
+            stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
 
-        # add new image
-        imageId = db.tryInsertID(sql"""
-                Insert Into images (hash, format, width, height) Values (?, ?, ?, ?)
-        """, hash, file.mime, width, height)
+    # add new image
+    imageId = db.tryInsertID(sql"""
+            Insert Into images (hash, format, width, height) Values (?, ?, ?, ?)
+    """, hash, file.mime, width, height)
 
-        if imageId == -1:
-            raise newException(BooruException, "Failed inserting image into db!")
+    if imageId == -1:
+        raise newException(BooruException, "Failed inserting image into db!")
+
+    if not (extension in ["mp4"]):
+        let pHash = phash.pHash(file.contents)
+        db.exec(sql"Insert Into image_phashes(image_id, phash) Values (?, ?)", imageId, pHash)
+        log.info("Assigned hash to new image", imgId=imageId, hash=pHash)
 
     db.close()
 
@@ -215,6 +223,7 @@ proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyE
         removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
         # then delete it from the db
         db.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
+        db.exec(sql"Delete From image_phashes Where image_id = ?", $imageId)
         db.exec(sql"Delete From images Where id = ?", $imageId)
         log.info("Image deleted", imgId=imageId)
     else:

@@ -183,6 +183,10 @@ main h2:first-of-type {
 	min-width: 100%;
 }
 
+.formSingleEntry {
+	margin-bottom: 1em;
+}
+
 .galleryItems {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(12em, max-content));

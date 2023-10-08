@@ -10,6 +10,8 @@ when NimMajor > 1:
 else:
     import std/db_sqlite
 
+import ../helpers/sqliteLoadExt
+
 import chronicles as log
 
 type
@@ -29,6 +31,9 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.rai
     result = @[]
     let db = open(dbFile, "", "", "")
     defer: db.close()
+
+    assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
+    assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
 
     for row in db.instantRows(query.sql(), args):
         result.add(
@@ -157,6 +162,10 @@ proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
 
     let db = open(dbFile, "", "", "")
     defer: db.close()
+
+    assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
+    assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
+
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select Count(1) From root_query"
     return db.getValue(cxquery.sql()).parseInt()
@@ -291,3 +300,12 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, Val
     except ValidationError:
         log.debug("Keyword invalid", keyword=keyword)
         return result
+
+proc buildImageSimilarityQuery*(image: ImageEntryRef, maxDistance: int = 64): string =
+    return """
+        Select id, hash, format, width, height From (
+            Select image_id, popcount((comparator | phash) - (comparator & phash)) as distance From
+                (Select phash As comparator From image_phashes Where image_id = """ & $(image.id) & """)
+                Cross Join image_phashes
+        ) Left Join images on image_id = images.id Where distance < """ & $maxDistance & """ Order by distance Asc
+    """

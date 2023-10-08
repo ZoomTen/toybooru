@@ -8,6 +8,7 @@ import ./backend/exceptions
 import ./backend/images as images
 import ./backend/authentication as auth
 import ./backend/userConfig as config
+import ./backend/pHashes as phash
 
 import std/[
     strutils, json
@@ -100,6 +101,20 @@ router mainRouter:
             rq=request
         )
 
+    get "/entry/@id/similar":
+        setCookie(sessionCookieName, auth.getSessionIdFrom(request))
+        var img: ImageEntryRef
+        try:
+            img = images.getQueried(
+                "Select * From images Where id = ?", $(@"id".parseInt)
+            )[0]
+        except:
+            resp Http404
+        resp render.masterTemplate(
+            siteContent=render.siteSimilar(request, img),
+            rq=request
+        )
+
     get "/entry/@id/edit":
         let sessId = auth.getSessionIdFrom(request)
         setCookie(sessionCookieName, sessId)
@@ -178,7 +193,8 @@ router mainRouter:
             if not request.formData.hasKey("data"):
                 raise newException(BooruException, "No image sent?")
 
-            let rawTags = request.formData["tags"].body
+            let
+                rawTags = request.formData["tags"].body
 
             upload.processFile(
                 upload.fileFromReq(request.formData["data"]),
@@ -301,6 +317,7 @@ when isMainModule:
     setup.tagTable()
     setup.userTable()
     setup.userBlacklistsTable()
+    setup.imagePhashesTable()
     setup.sessionTable()
     auth.invalidateExpiredSessions()
     serverMain()
