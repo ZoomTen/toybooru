@@ -164,14 +164,15 @@ proc getImageTagsOfListSidebar*(rq: Request): VNode {.raises: [DbError, ValueErr
                 tagEntry.toTagDisplay(userQuery)
         a(href="/taglist"): text "View all tags"
 
-proc relatedContent(query: string = ""): VNode =
+proc relatedContent(query: string = "", shouldShowRandomPics: bool = true): VNode =
     return buildHtml(aside):
         h2: text "Related"
         ul(class="navLinks", id="galleryLinks"):
-            if query.strip == "":
-                li: a(href="/random"): text "Random pic"
-            else:
-                li: a(href="/random?q="&query): text "Random pic from this query"
+            if shouldShowRandomPics:
+                if query.strip == "":
+                    li: a(href="/random"): text "Random pic"
+                else:
+                    li: a(href="/random?q="&query): text "Random pic from this query"
             li: a(href="/untagged"): text "View untagged posts"
 
 proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].} =
@@ -328,7 +329,7 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
                     uploadForm()
                 if imageList.len >= 1:
                     getImageTagsOfListSidebar(rq)
-                    relatedContent(userQuery)
+                relatedContent(userQuery, (imageList.len >= 1))
 
 proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
     let
