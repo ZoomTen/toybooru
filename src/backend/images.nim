@@ -71,7 +71,7 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.rai
     Inner Join images On image_id = images.id
     Where image_id Not In exclude_or
 ]#
-proc buildTagQuery*(includes, excludes: seq[int] = @[]): string {.raises: [ValueError].}=
+proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string {.raises: [ValueError].}=
     log.logScope:
         topics = "buildTagQuery"
 
