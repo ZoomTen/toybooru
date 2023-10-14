@@ -29,6 +29,7 @@ const
     sessionCookieName* = "TOYBOORU_SESSION"
     usernameFieldName* = "usn"
     passwordFieldName* = "pw"
+    rememberFieldName* = "rmm"
     confirmPasswordFieldName* = "cfpw"
     antiCsrfFieldName* = "acsrf"
 

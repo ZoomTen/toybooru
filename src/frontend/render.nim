@@ -599,6 +599,9 @@ proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode =
                 tdiv(class="formRow"):
                     label(`for`=passwordFieldName): text "Password"
                     input(id=passwordFieldName, name=passwordFieldName, type="password", placeholder="hunter2")
+                tdiv:
+                    input(id=rememberFieldName, name=rememberFieldName, type="checkbox")
+                    label(`for`=rememberFieldName): text "Keep me signed in until I log out"
                 input(type="submit", value="Login")
                 span:
                     a(href="/signup"): text "Or sign up"

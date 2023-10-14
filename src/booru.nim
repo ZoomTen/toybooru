@@ -197,7 +197,7 @@ router mainRouter:
         )
 
     post "/login":
-        let (user, errors, alreadyLoggedIn) = auth.processLogIn(request)
+        let (user, errors, alreadyLoggedIn, remember) = auth.processLogIn(request)
         if user.isNone():
             resp Http400, render.masterTemplate(
                 siteContent=render.logIn(request, errors),
@@ -207,7 +207,8 @@ router mainRouter:
             if not alreadyLoggedIn:
                 auth.doLogIn(
                     auth.getSessionIdFrom(request),
-                    user.get()
+                    user.get(),
+                    remember
                 )
             redirect "/"
 
@@ -296,3 +297,4 @@ when isMainModule:
     setup.imagePhashesTable()
     setup.sessionTable()
     serverMain()
+    auth.invalidateExpiredSessions()

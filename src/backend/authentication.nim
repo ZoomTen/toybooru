@@ -221,7 +221,12 @@ proc doSignUp*(user: User, pw: string)  =
             Insert Into user_blacklists(user_id) Values (?)
         """, userId)
 
-proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception], alreadyLoggedIn: bool] =
+proc processLogIn*(req: Request): tuple[
+    user: Option[User],
+    errors: seq[ref Exception],
+    alreadyLoggedIn: bool,
+    dontAutoLogOut: bool
+] =
     log.logScope:
         topics = "processLogIn"
 
@@ -231,7 +236,12 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     if existingUser.isSome():
         log.debug("User already logged in", user=existingUser.get().name)
         # skip the login process
-        return (user: existingUser, errors: @[], alreadyLoggedIn: true)
+        return (
+            user: existingUser,
+            errors: @[],
+            alreadyLoggedIn: true,
+            dontAutoLogOut: true
+        )
 
     let
         sessionDb = open(sessionDbFile, "", "", "")
@@ -252,6 +262,7 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     var
         uname = req.params.getOrDefault(usernameFieldName, "")
         pw = req.params.getOrDefault(passwordFieldName, "")
+        remember = req.params.getOrDefault(rememberFieldName, "")
 
     let userData = userDb.getRow(sql"Select id, username, joined_on, logged_in, password From users Where username = ?", uname)
 
@@ -279,10 +290,11 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
     return (
         user: user,
         errors: errors,
-        alreadyLoggedIn: false
+        alreadyLoggedIn: false,
+        dontAutoLogOut: (remember.strip() != "")
     )
 
-proc doLogIn*(sessId: string, user: User) =
+proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
     log.logScope:
         topics = "doLogIn"
 
@@ -306,6 +318,13 @@ proc doLogIn*(sessId: string, user: User) =
         sessId, user.id
     )
     log.debug("Someone has logged in", sessId=sessId, userName=user.name)
+
+    if dontAutoLogOut:
+        sessionDb.exec(
+            sql"Update sessions Set expires = 0 Where sid = ?",
+            sessId
+        )
+        log.debug("Requested persistent session", sessId=sessId, userName=user.name)
 
     userDb.exec(
         sql"Update users Set logged_in = ? Where id = ?",
