@@ -8,9 +8,7 @@ else:
 
 import chronicles as log
 
-{.push raises:[].}
-
-proc folders*() {.raises: [OSError, IOError].}=
+proc folders*() =
     log.logScope:
         topics = "setup.folders"
 
@@ -19,7 +17,7 @@ proc folders*() {.raises: [OSError, IOError].}=
         log.info("Created image folder", dir=dir)
         createDir(dir)
 
-proc imageTable*() {.raises: [DbError].}=
+proc imageTable*() =
     log.logScope:
         topics = "setup.imageTable"
 
@@ -38,7 +36,7 @@ proc imageTable*() {.raises: [DbError].}=
     """)
     log.info("Initialized image table")
 
-proc tagTable*() {.raises: [DbError].}=
+proc tagTable*() =
     log.logScope:
         topics = "setup.tagTable"
 
@@ -66,7 +64,7 @@ proc tagTable*() {.raises: [DbError].}=
     """)
     log.info("Initialized image/tag relation table")
 
-proc userTable*() {.raises: [DbError].} =
+proc userTable*()  =
     log.logScope:
         topics = "setup.userTable"
 
@@ -87,7 +85,7 @@ proc userTable*() {.raises: [DbError].} =
 
     log.info("Initialized users table")
 
-proc userBlacklistsTable*() {.raises: [DbError].} =
+proc userBlacklistsTable*()  =
     log.logScope:
         topics = "setup.userBlacklistsTable"
 
@@ -103,7 +101,7 @@ proc userBlacklistsTable*() {.raises: [DbError].} =
     """, defaultBlacklist)
     log.info("Initialized user blacklists table")
 
-proc imagePhashesTable*() {.raises: [DbError].} =
+proc imagePhashesTable*()  =
     log.logScope:
         topics = "setup.imagePhashesTable"
 
@@ -119,7 +117,7 @@ proc imagePhashesTable*() {.raises: [DbError].} =
     """)
     log.info("Initialized image perceptual hashes table")
 
-proc sessionTable*() {.raises: [DbError].} =
+proc sessionTable*()  =
     log.logScope:
         topics = "setup.sessionTable"
 

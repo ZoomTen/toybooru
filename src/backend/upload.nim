@@ -18,8 +18,6 @@ else:
 
 import ./pHashes as phash
 
-{.push raises:[].}
-
 type
     FileUploadRef* = ref object
         contents: string # wanted a ref :(
@@ -37,23 +35,23 @@ proc newFileUploadRef*(contents: string, length: int, filename, mime: string): F
 
 proc fileFromReq*(
     req: tuple[fields: StringTableRef, body: string]
-): FileUploadRef {.raises:[KeyError].} =
+): FileUploadRef  =
     result = newFileUploadRef(
         req.body, req.body.len(), req.fields["filename"], req.fields["Content-Type"]
     )
 
-proc clearTags*(imageId: int) {.raises:[DbError].} =
+proc clearTags*(imageId: int)  =
     let db = open(dbFile, "", "", "")
     defer: db.close()
     db.exec(sql"Delete From image_tags Where image_id = ?", imageId)
 
-proc refreshTagCounts*() {.raises:[DbError].} =
+proc refreshTagCounts*()  =
     let db = open(dbFile, "", "", "")
     defer: db.close()
     for row in db.instantRows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
-proc assignTags*(imageId: int, t: string) {.raises:[DbError, BooruException].} =
+proc assignTags*(imageId: int, t: string)  =
     log.logScope:
         topics = "upload.assignTags"
     var tags = ""
@@ -206,7 +204,7 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     log.info("Added new image", imgId=imageId)
     imageId.int.assignTags(tags)
 
-proc deleteImage*(imageId: int) {.raises:[DbError, BooruException, OSError, KeyError].} =
+proc deleteImage*(imageId: int)  =
     log.logScope:
         topics = "upload.deleteImage"
 

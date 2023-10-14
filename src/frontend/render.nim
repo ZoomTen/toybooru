@@ -21,8 +21,6 @@ import chronicles as log
 import packages/docutils/rst as rst
 import packages/docutils/rstgen as rstgen
 
-{.push raises: [].}
-
 type
     PageVars* = tuple
         query: string ## final query
@@ -74,7 +72,7 @@ proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
             params.getOrDefault("count", $defaultNumResults).parseInt()
         except ValueError: defaultNumResults
 
-proc genericMakeTagText(tagGet: TagTuple): VNode {.raises: [ValueError].} =
+proc genericMakeTagText(tagGet: TagTuple): VNode  =
     let isNamespaced = tagGet.tag.find(":")
     if isNamespaced == -1:
         return buildHtml(span):
@@ -89,7 +87,7 @@ proc genericMakeTagText(tagGet: TagTuple): VNode {.raises: [ValueError].} =
 proc compareTags(a, b: TagTuple): int =
     cmp(a.tag, b.tag)
 
-proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode {.raises: [ValueError].} =
+proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode  =
     let q = query.strip()
     return buildHtml(li):
         a(href="/list?q="&q&"+"&tagEntry.tag, title="add to search"): text "+"
@@ -100,7 +98,7 @@ proc toTagDisplay(tagEntry: TagTuple, query: string = ""): VNode {.raises: [Valu
         text " "
         genericMakeTagText tagEntry
 
-proc getPopularTagsSidebar(): VNode {.raises: [DbError, ValueError].}=
+proc getPopularTagsSidebar(): VNode =
     var popularTags = images.getMostPopularTagsGeneral(25)
     popularTags.sort(compareTags)
     return buildHtml(nav):
@@ -110,7 +108,7 @@ proc getPopularTagsSidebar(): VNode {.raises: [DbError, ValueError].}=
                 tagEntry.toTagDisplay
         # a(href="#"): text "View all tags"
 
-proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises: [DbError, ValueError].}=
+proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
     let tags = images.getTagsFor(img)
     return buildHtml(nav):
         if tags.len > 0:
@@ -120,7 +118,7 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode {.raises:
                     tagEntry.toTagDisplay(query)
         a(href="/taglist"): text "View all tags"
 
-proc getImageTagsOfListSidebar*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
+proc getImageTagsOfListSidebar*(rq: Request): VNode  =
     log.logScope:
         topics = "getImageTagsOfListSidebar"
 
@@ -183,7 +181,7 @@ proc relatedContent(query: string = "", shouldShowRandomPics: bool = true): VNod
                     li: a(href="/random?q="&query): text "Random pic from this query"
             li: a(href="/untagged"): text "View untagged posts"
 
-proc siteHeader(rq: Request): VNode {.raises:[IOSelectorsException, Exception].} =
+proc siteHeader(rq: Request): VNode  =
     let user = auth.getSessionIdFrom(rq).getCurrentUser()
     let (query, originalQuery, pageNum, numResults, distance) = rq.params.getVarsFromParams(user)
     return buildHtml(header):
@@ -272,7 +270,7 @@ proc buildGalleryPagination(numPages, pageNum, numResults: int, query: string = 
                 li: a(aria-label="Next", href="?page=" & $(pageNum+1) & appendParam & queryParam): text ">"
                 li: a(aria-label="Last", href="?page=" & $(numPages-1) & appendParam & queryParam): text ">>"
 
-proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode {.raises: [DbError, ValueError].} =
+proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode  =
     let queryAddition = if query.strip() != "":
                 "?q=" & query
             else: ""
@@ -286,7 +284,7 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode {.ra
                         )
                     )
 
-proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
+proc siteList*(rq: Request): VNode   =
     log.logScope:
         topics = "siteList"
 
@@ -339,7 +337,7 @@ proc siteList*(rq: Request): VNode  {.raises: [DbError, ValueError, IOSelectorsE
                     getImageTagsOfListSidebar(rq)
                 relatedContent(userQuery, (imageList.len >= 1))
 
-proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
+proc siteUntagged*(rq: Request): VNode  =
     let
         params = rq.params
         paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
@@ -368,7 +366,7 @@ proc siteUntagged*(rq: Request): VNode {.raises: [DbError, ValueError, IOSelecto
                     imageList.buildGallery()
                     numPages.buildGalleryPagination(pageNum, numResults)
 
-proc siteSimilar*(rq: Request, img: images.ImageEntryRef): VNode {.raises: [DbError, ValueError, IOSelectorsException, Exception].} =
+proc siteSimilar*(rq: Request, img: images.ImageEntryRef): VNode  =
     let
         params = rq.params
         paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
@@ -399,7 +397,7 @@ proc siteSimilar*(rq: Request, img: images.ImageEntryRef): VNode {.raises: [DbEr
                 imageList.buildGallery()
                 numPages.buildGalleryPagination(pageNum, numResults)
 
-proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyError, ValueError, IOSelectorsException, Exception].} =
+proc siteEntry*(img: ImageEntryRef, rq: Request): VNode  =
     let mimeMappings = makeMimeMappings()
     let
         user = auth.getSessionIdFrom(rq).getCurrentUser()
@@ -440,7 +438,7 @@ proc siteEntry*(img: ImageEntryRef, rq: Request): VNode {.raises: [DbError, KeyE
                 getImageTagsSidebar(img, paramTuple.originalQuery)
                 relatedContent(paramTuple.originalQuery)
 
-proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError, Exception].} =
+proc siteEntryEdit*(img: ImageEntryRef): VNode   =
     let mimeMappings = makeMimeMappings()
     return buildHtml(main):
         section(id="image"):
@@ -469,7 +467,7 @@ proc siteEntryEdit*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError, 
 * **Tag-what-else-you-see!** Favor more frequent tags.
 """, {rst.roSupportMarkdown, rst.roPreferMarkdown}, newStringTable(modeStyleInsensitive))
 
-proc siteEntryConfirmDelete*(img: ImageEntryRef): VNode  {.raises: [DbError, ValueError].} =
+proc siteEntryConfirmDelete*(img: ImageEntryRef): VNode   =
     let mimeMappings = makeMimeMappings()
     return buildHtml(main):
         section(id="image"):
@@ -493,7 +491,7 @@ proc siteWiki*(): VNode =
             # TODO: markdown and RST conversion here
             p: text "Not available yet!"
 
-proc siteAllTags*(rq: Request): VNode {.raises: [DbError, ValueError, Exception].} =
+proc siteAllTags*(rq: Request): VNode  =
     let (query, originalQuery, pageNum, numResults, distance) = rq.params.getVarsFromParams(
         auth.getSessionIdFrom(rq).getCurrentUser()
     )
@@ -505,7 +503,7 @@ proc siteAllTags*(rq: Request): VNode {.raises: [DbError, ValueError, Exception]
                 for tagEntry in tags:
                     tagEntry.toTagDisplay(query)
 
-proc masterTemplate*(title: string = "", rq: Request, siteContent: VNode): string {.raises:[IOSelectorsException, Exception, ValueError, KeyError].}=
+proc masterTemplate*(title: string = "", rq: Request, siteContent: VNode): string =
     let
         vn = buildHtml(html):
             head:
@@ -531,7 +529,7 @@ proc masterTemplate*(title: string = "", rq: Request, siteContent: VNode): strin
                 script(src="/assets/autocomplete.js")
     return "<!DOCTYPE html>\n" & $vn
 
-proc landingPage*(rq: Request): string {.raises: [ValueError, DbError, IOSelectorsException, Exception].}=
+proc landingPage*(rq: Request): string =
     let
         postCount = images.getCountOfQuery("Select * From images")
         vn = buildHtml(html):
@@ -582,7 +580,7 @@ proc `403`*(): VNode =
             h2: text "Forbidden"
             p: text "You don't have enough permissions to do this!"
 
-proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].}=
+proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode =
     let newToken = auth.setNewAcsrfToken(
         auth.getSessionIdFrom(rq)
     )
@@ -605,7 +603,7 @@ proc logIn*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbE
                 span:
                     a(href="/signup"): text "Or sign up"
 
-proc signUp*(rq: Request, errors: seq[ref Exception] = @[]): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].}=
+proc signUp*(rq: Request, errors: seq[ref Exception] = @[]): VNode =
     let newToken = auth.setNewAcsrfToken(
         auth.getSessionIdFrom(rq)
     )
@@ -641,7 +639,7 @@ proc signUpSuccess*(): VNode =
                 a(href="/login"): text "log in to it"
                 text " now?"
 
-proc configPage*(rq: Request): VNode {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].} =
+proc configPage*(rq: Request): VNode  =
     let
         user = auth.getSessionIdFrom(rq).getCurrentUser()
         blist = config.getBlacklistConfig(user.get())

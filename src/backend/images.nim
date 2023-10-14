@@ -23,11 +23,9 @@ type
         tag: string
         count: int
 
-{.push raises:[].}
-
 ## Get query as a sequence of ImageEntryRef, must match the column *order*
 ## of the images table.
-proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.raises:[DbError, ValueError].}=
+proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     result = @[]
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -71,7 +69,7 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] {.rai
     Inner Join images On image_id = images.id
     Where image_id Not In exclude_or
 ]#
-proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string {.raises: [ValueError].}=
+proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string =
     log.logScope:
         topics = "buildTagQuery"
 
@@ -156,7 +154,7 @@ proc buildPageQuery*(
             descending=descending
         )
 
-proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
+proc getCountOfQuery*(query: string): int  =
     if query == "":
         return 0
 
@@ -170,7 +168,7 @@ proc getCountOfQuery*(query: string): int  {.raises:[DbError, ValueError].}=
     cxquery &= "Select Count(1) From root_query"
     return db.getValue(cxquery.sql()).parseInt()
 
-proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  {.raises:[DbError, ValueError].}=
+proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
     result = @[]
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -180,14 +178,14 @@ proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  {.raises
             (tag: row[0], count: row[1].parseInt())
         )
 
-proc getRandomIdFrom*(query: string): int  {.raises:[DbError, ValueError].}=
+proc getRandomIdFrom*(query: string): int  =
     let db = open(dbFile, "", "", "")
     defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select id From root_query Order By Random() Limit 1"
     return db.getValue(cxquery.sql()).parseInt()
 
-proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  {.raises:[DbError, ValueError].}=
+proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
@@ -204,7 +202,7 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  {.raises:[DbError, ValueE
             (tag: row[0], count: row[1].parseInt())
         )
 
-proc getAllTags*(): seq[TagTuple]  {.raises:[DbError, ValueError].}=
+proc getAllTags*(): seq[TagTuple]  =
     let db = open(dbFile, "", "", "")
     defer: db.close()
 
@@ -225,7 +223,7 @@ proc buildSearchQuery*(
         query: string = "",
         pageNum:int = 0,
         numResults:int = defaultNumResults
-    ): string {.raises:[DbError, ValueError].}=
+    ): string =
         log.logScope:
             topics = "buildSearchQuery"
 
@@ -279,7 +277,7 @@ proc buildSearchQuery*(
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
-proc getTagAutocompletes*(keyword: string): seq[TagTuple] {.raises:[DbError, ValueError].} =
+proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
     log.logScope:
         topics = "getTagAutocompletes"
 

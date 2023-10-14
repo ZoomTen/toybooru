@@ -20,8 +20,6 @@ export options
 export selectors
 export sodium
 
-{.push raises: [].}
-
 type
     User* = object
         id*: int
@@ -43,12 +41,12 @@ proc toSessId*(req: Request): string =
         log.debug("Unable to generate session ID hash, using random number instead.", kind=e.name, emsg=e.msg)
         return $(r.next())
 
-proc toHashed*(s: string): string {.raises: [SodiumError, ValueError].}=
+proc toHashed*(s: string): string=
     result = s.cryptoGenericHash(
         cryptoGenericHashBytes()
     ).toHex().toLower()
 
-proc invalidateExpiredSessions*() {.raises:[DbError].} =
+proc invalidateExpiredSessions*() =
     log.logScope:
         topics = "invalidateExpiredSessions"
 
@@ -64,7 +62,7 @@ proc invalidateExpiredSessions*() {.raises:[DbError].} =
     if numDeletedSessions > 0:
         log.debug "Deleted expired sessions", numSessions=numDeletedSessions
 
-proc getSessionIdFrom*(req: Request): string {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError].} =
+proc getSessionIdFrom*(req: Request): string =
     log.logScope:
         topics = "getSessionIdFrom"
 
@@ -87,7 +85,7 @@ proc getSessionIdFrom*(req: Request): string {.raises: [DbError, IOSelectorsExce
     else: # session exists
         return cookieParam
 
-proc userFromRow(user: Row): User {.raises:[ValueError].}=
+proc userFromRow(user: Row): User =
     return User(
         id: user[0].parseInt(),
         name: user[1],
@@ -95,7 +93,7 @@ proc userFromRow(user: Row): User {.raises:[ValueError].}=
         lastLoggedIn: user[3].parseInt().fromUnix()
     )
 
-proc getCurrentUser*(sessId: string): Option[User] {.raises: [DbError, ValueError].} =
+proc getCurrentUser*(sessId: string): Option[User]  =
     log.logScope:
         topics = "getCurrentUser"
 
@@ -127,7 +125,7 @@ proc getCurrentUser*(sessId: string): Option[User] {.raises: [DbError, ValueErro
 
     return some(userFromRow(user))
 
-proc setNewAcsrfToken*(sessId: string): string {.raises: [DbError].} =
+proc setNewAcsrfToken*(sessId: string): string  =
     log.logScope:
         topics = "setNewAcsrfToken"
 
@@ -146,7 +144,7 @@ proc setNewAcsrfToken*(sessId: string): string {.raises: [DbError].} =
         sessDb.exec(sql"Update session_acsrf Set token = ? Where sid = ?", acsrfString, sessId)
     return acsrfString
 
-proc verifyAcsrfToken*(sessId: string, acsrfToken: string) {.raises: [DbError, TokenException].} =
+proc verifyAcsrfToken*(sessId: string, acsrfToken: string)  =
     let sessDb = open(sessionDbFile, "", "", "")
     defer: sessDb.close()
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
@@ -154,7 +152,7 @@ proc verifyAcsrfToken*(sessId: string, acsrfToken: string) {.raises: [DbError, T
     if sessDb.getValue(sql"""Select 1 From session_acsrf Where sid = ? And token = ?""", sessId, acsrfToken) != "1":
         raise newException(TokenException, "Please try again...")
 
-proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]] {.raises: [DbError, IOSelectorsException, KeyError, SodiumError, ValueError, Exception].} =
+proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]]  =
     let mainDb = open(dbFile, "", "", "")
     defer: mainDb.close()
 
@@ -205,7 +203,7 @@ proc processSignUp*(req: Request): tuple[user: Option[User], password: string, e
         )
     return (user: user, password: rqPassword, errors: errors)
 
-proc doSignUp*(user: User, pw: string) {.raises: [DbError, SodiumError, ValueError].} =
+proc doSignUp*(user: User, pw: string)  =
     let mainDb = open(dbFile, "", "", "")
     defer: mainDb.close()
 
@@ -223,7 +221,7 @@ proc doSignUp*(user: User, pw: string) {.raises: [DbError, SodiumError, ValueErr
             Insert Into user_blacklists(user_id) Values (?)
         """, userId)
 
-proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception], alreadyLoggedIn: bool] {.raises: [DbError, ValueError, IOSelectorsException, SodiumError, Exception].}=
+proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exception], alreadyLoggedIn: bool] =
     log.logScope:
         topics = "processLogIn"
 
@@ -284,7 +282,7 @@ proc processLogIn*(req: Request): tuple[user: Option[User], errors: seq[ref Exce
         alreadyLoggedIn: false
     )
 
-proc doLogIn*(sessId: string, user: User) {.raises: [DbError].}=
+proc doLogIn*(sessId: string, user: User) =
     log.logScope:
         topics = "doLogIn"
 
@@ -315,7 +313,7 @@ proc doLogIn*(sessId: string, user: User) {.raises: [DbError].}=
         user.id
     )
 
-proc logOut*(sessId: string) {.raises: [DbError].}=
+proc logOut*(sessId: string) =
     ## Simply deletes the session, as that'll delete everything under it too
     let sessionDb = open(sessionDbFile, "", "", "")
     sessionDb.exec(sql"PRAGMA foreign_keys = ON")

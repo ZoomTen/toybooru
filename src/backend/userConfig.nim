@@ -11,9 +11,7 @@ when NimMajor > 1:
 else:
     import std/db_sqlite
 
-{.push raises:[].}
-
-proc getBlacklistConfig*(user: User): string {.raises:[DbError].}=
+proc getBlacklistConfig*(user: User): string =
     ## Fetches the raw blacklist config straight from the DB
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -23,7 +21,7 @@ proc getBlacklistConfig*(user: User): string {.raises:[DbError].}=
         $(user.id)
     ).strip()
 
-proc setBlacklistConfig*(user: User, blklist: string) {.raises:[DbError].} =
+proc setBlacklistConfig*(user: User, blklist: string)  =
     ## Sets raw blacklist config
     let db = open(dbFile, "", "", "")
     defer: db.close()
@@ -33,7 +31,7 @@ proc setBlacklistConfig*(user: User, blklist: string) {.raises:[DbError].} =
         blklist, $(user.id)
     )
 
-proc processSetBlacklistConfig*(user: User, rq: Request) {.raises:[Exception].}=
+proc processSetBlacklistConfig*(user: User, rq: Request) =
     log.logScope:
         topics = "processSetBlacklistConfig"
     let newBlacklist = rq.params.getOrDefault(blacklistFieldName, "")
