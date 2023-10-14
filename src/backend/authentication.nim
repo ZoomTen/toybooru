@@ -144,13 +144,16 @@ proc setNewAcsrfToken*(sessId: string): string  =
         sessDb.exec(sql"Update session_acsrf Set token = ? Where sid = ?", acsrfString, sessId)
     return acsrfString
 
-proc verifyAcsrfToken*(sessId: string, acsrfToken: string)  =
+proc verifyAcsrfToken*(sessId: string, acsrfToken: string) =
     let sessDb = open(sessionDbFile, "", "", "")
     defer: sessDb.close()
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
-    if sessDb.getValue(sql"""Select 1 From session_acsrf Where sid = ? And token = ?""", sessId, acsrfToken) != "1":
+    if sessDb.getValue(sql"Select 1 From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken) != "1":
         raise newException(TokenException, "Please try again...")
+
+    # Token used
+    sessDb.exec(sql"Delete From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken)
 
 proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]]  =
     let mainDb = open(dbFile, "", "", "")
