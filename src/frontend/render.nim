@@ -215,7 +215,10 @@ proc siteHeader(rq: Request): VNode  =
                 li:
                     a(href="/wiki"): text "Wiki"
 
-proc uploadForm(): VNode =
+proc uploadForm(rq: Request): VNode =
+    let newToken = auth.setNewAcsrfToken(
+        auth.getSessionIdFrom(rq)
+    )
     return buildHtml(
         form(class="formBox",
              action="/upload",
@@ -225,6 +228,7 @@ proc uploadForm(): VNode =
             h2:
                 text "Upload"
             input(name="data", type="file")
+            input(hidden=true, type="text", name=antiCsrfFieldName, value=newToken)
             tdiv(class="textAreaAndSubmit"):
                 textarea(name="tags",
                          placeholder="tag_me and_stuff yo",
@@ -332,7 +336,7 @@ proc siteList*(rq: Request): VNode   =
                     numPages.buildGalleryPagination(pageNum, numResults, userQuery)
             section(id="tags"):
                 if user.isSome():
-                    uploadForm()
+                    uploadForm(rq)
                 if imageList.len >= 1:
                     getImageTagsOfListSidebar(rq)
                 relatedContent(userQuery, (imageList.len >= 1))
