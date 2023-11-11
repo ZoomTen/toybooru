@@ -11,10 +11,16 @@ import ../settings
 import ./exceptions
 import ./validation
 
-when NimMajor > 1:
-    import db_connector/db_sqlite
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
 else:
-    import std/db_sqlite
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
 
 export options
 export selectors
@@ -51,7 +57,8 @@ proc invalidateExpiredSessions*() =
         topics = "invalidateExpiredSessions"
 
     let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
-    sessDb.exec(sql"PRAGMA foreign_keys = ON") # needed for cascade
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON") # needed for cascade
     defer: sessDb.close()
 
     let numDeletedSessions = sessDb.execAffectedRows(
@@ -67,7 +74,8 @@ proc getSessionIdFrom*(req: Request): string =
         topics = "getSessionIdFrom"
 
     let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
-    sessDb.exec(sql"PRAGMA foreign_keys = ON") # needed for cascade
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
     defer: sessDb.close()
 
     # get cookie parameter from the session
@@ -103,7 +111,9 @@ proc getCurrentUser*(sessId: string): Option[User]  =
     defer:
         sessDb.close()
         mainDb.close()
-    sessDb.exec(sql"PRAGMA foreign_keys = ON")
+    
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     let userId = sessDb.getValue(
         sql"Select user_id From sessions_users Where sid = ?",
@@ -131,7 +141,8 @@ proc setNewAcsrfToken*(sessId: string): string  =
 
     let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     defer: sessDb.close()
-    sessDb.exec(sql"PRAGMA foreign_keys = ON")
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     # generate new ACSRF string
     let acsrfString = randombytes(16).toHex().toLower()
@@ -147,7 +158,8 @@ proc setNewAcsrfToken*(sessId: string): string  =
 proc verifyAcsrfToken*(sessId: string, acsrfToken: string) =
     let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     defer: sessDb.close()
-    sessDb.exec(sql"PRAGMA foreign_keys = ON")
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     if sessDb.getValue(sql"Select 1 From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken) != "1":
         raise newException(TokenException, "Please try again...")
@@ -252,7 +264,8 @@ proc processLogIn*(req: Request): tuple[
     defer:
         sessionDb.close()
         userDb.close()
-    sessionDb.exec(sql"PRAGMA foreign_keys = ON")
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     var errors: seq[ref Exception] = @[]
     let
@@ -307,7 +320,8 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
     defer:
         sessionDb.close()
         userDb.close()
-    sessionDb.exec(sql"PRAGMA foreign_keys = ON")
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     # check if session is valid
     if sessionDb.getValue(
@@ -338,7 +352,8 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
 proc logOut*(sessId: string) =
     ## Simply deletes the session, as that'll delete everything under it too
     let sessionDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
-    sessionDb.exec(sql"PRAGMA foreign_keys = ON")
+    when not defined(usePostgres):
+        sessDb.exec(sql"PRAGMA foreign_keys = ON")
     defer: sessionDb.close()
 
     log.debug("A user logged out", sessId=sessId)
