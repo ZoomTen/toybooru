@@ -20,7 +20,7 @@ when isMainModule:
         setup.imageTable()
         setup.imagePhashesTable()
 
-        let db = open(dbFile, "", "", "")
+        let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
         defer: db.close()
 
         let mimeMappings = makeMimeMappings()

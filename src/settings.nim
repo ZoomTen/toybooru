@@ -14,10 +14,33 @@ const
     imgDir* = pubDir & imgSuffix
     thumbDir* = pubDir & thumbSuffix
 
-# db files also relative to source dir
-    dbFile* = "main.db"
-    sessionDbFile* = "session.db"
+when defined(usePostgres):
+    const
+        mainDbUrl* = ""
+        mainDbUser* = ""
+        mainDbPass* = ""
+        mainDbDatabase* = "host=localhost port=5432 user=toybooru password=toybooru dbname=toybooru_main"
+    
+        sessionDbUrl* = ""
+        sessionDbUser* = ""
+        sessionDbPass* = ""
+        sessionDbDatabase* = "host=localhost port=5432 user=toybooru password=toybooru dbname=toybooru_session"
+else:
+    const
+    # db files also relative to source dir
+        mainDbUrl* = "main.db"
+    # for Sqlite, the following 3 should be blank
+        mainDbUser* = ""
+        mainDbPass* = ""
+        mainDbDatabase* = ""
+    
+        sessionDbUrl* = "session.db"
+    # for Sqlite, the following 3 should be blank
+        sessionDbUser* = ""
+        sessionDbPass* = ""
+        sessionDbDatabase* = ""
 
+const
 # parameters
     thumbSize* = 250 # width or height, whichever's greater
     defaultNumResults* = 25

@@ -41,12 +41,12 @@ proc fileFromReq*(
     )
 
 proc clearTags*(imageId: int)  =
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
     db.exec(sql"Delete From image_tags Where image_id = ?", imageId)
 
 proc refreshTagCounts*()  =
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
     for row in db.instantRows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
@@ -63,7 +63,7 @@ proc assignTags*(imageId: int, t: string)  =
 
     if tags == "": return
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     # verify image exists
@@ -115,7 +115,7 @@ proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     log.logScope:
         topics = "upload.processFile"
     let mimeMappings = makeMimeMappings()
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
 
     let hash = getMD5(file.contents)
     var
@@ -209,7 +209,7 @@ proc deleteImage*(imageId: int)  =
         topics = "upload.deleteImage"
 
     let mimeMappings = makeMimeMappings()
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
     let row = db.getRow(sql"Select hash, format From images Where id = ?", $imageId)
     if row != @[]:

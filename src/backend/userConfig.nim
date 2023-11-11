@@ -13,7 +13,7 @@ else:
 
 proc getBlacklistConfig*(user: User): string =
     ## Fetches the raw blacklist config straight from the DB
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     return db.getValue(
@@ -23,7 +23,7 @@ proc getBlacklistConfig*(user: User): string =
 
 proc setBlacklistConfig*(user: User, blklist: string)  =
     ## Sets raw blacklist config
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     db.exec(

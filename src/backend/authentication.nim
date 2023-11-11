@@ -50,7 +50,7 @@ proc invalidateExpiredSessions*() =
     log.logScope:
         topics = "invalidateExpiredSessions"
 
-    let sessDb = open(sessionDbFile, "", "", "")
+    let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     sessDb.exec(sql"PRAGMA foreign_keys = ON") # needed for cascade
     defer: sessDb.close()
 
@@ -66,7 +66,7 @@ proc getSessionIdFrom*(req: Request): string =
     log.logScope:
         topics = "getSessionIdFrom"
 
-    let sessDb = open(sessionDbFile, "", "", "")
+    let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     sessDb.exec(sql"PRAGMA foreign_keys = ON") # needed for cascade
     defer: sessDb.close()
 
@@ -98,8 +98,8 @@ proc getCurrentUser*(sessId: string): Option[User]  =
         topics = "getCurrentUser"
 
     let
-        sessDb = open(sessionDbFile, "", "", "")
-        mainDb = open(dbFile, "", "", "")
+        sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
+        mainDb = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer:
         sessDb.close()
         mainDb.close()
@@ -129,7 +129,7 @@ proc setNewAcsrfToken*(sessId: string): string  =
     log.logScope:
         topics = "setNewAcsrfToken"
 
-    let sessDb = open(sessionDbFile, "", "", "")
+    let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     defer: sessDb.close()
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
@@ -145,7 +145,7 @@ proc setNewAcsrfToken*(sessId: string): string  =
     return acsrfString
 
 proc verifyAcsrfToken*(sessId: string, acsrfToken: string) =
-    let sessDb = open(sessionDbFile, "", "", "")
+    let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     defer: sessDb.close()
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
@@ -156,7 +156,7 @@ proc verifyAcsrfToken*(sessId: string, acsrfToken: string) =
     sessDb.exec(sql"Delete From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken)
 
 proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]]  =
-    let mainDb = open(dbFile, "", "", "")
+    let mainDb = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: mainDb.close()
 
     var errors: seq[ref Exception] = @[]
@@ -207,7 +207,7 @@ proc processSignUp*(req: Request): tuple[user: Option[User], password: string, e
     return (user: user, password: rqPassword, errors: errors)
 
 proc doSignUp*(user: User, pw: string)  =
-    let mainDb = open(dbFile, "", "", "")
+    let mainDb = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: mainDb.close()
 
     let pwHashed = cryptoPwHashStr(pw)
@@ -247,8 +247,8 @@ proc processLogIn*(req: Request): tuple[
         )
 
     let
-        sessionDb = open(sessionDbFile, "", "", "")
-        userDb = open(dbFile, "", "", "")
+        sessionDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
+        userDb = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer:
         sessionDb.close()
         userDb.close()
@@ -302,8 +302,8 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
         topics = "doLogIn"
 
     let
-        sessionDb = open(sessionDbFile, "", "", "")
-        userDb = open(dbFile, "", "", "")
+        sessionDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
+        userDb = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer:
         sessionDb.close()
         userDb.close()
@@ -337,7 +337,7 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
 
 proc logOut*(sessId: string) =
     ## Simply deletes the session, as that'll delete everything under it too
-    let sessionDb = open(sessionDbFile, "", "", "")
+    let sessionDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     sessionDb.exec(sql"PRAGMA foreign_keys = ON")
     defer: sessionDb.close()
 

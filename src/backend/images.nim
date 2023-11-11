@@ -27,7 +27,7 @@ type
 ## of the images table.
 proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     result = @[]
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
@@ -158,7 +158,7 @@ proc getCountOfQuery*(query: string): int  =
     if query == "":
         return 0
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
@@ -170,7 +170,7 @@ proc getCountOfQuery*(query: string): int  =
 
 proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
     result = @[]
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     for row in db.instantRows(sql"Select tag, count From tags Order By count Desc Limit ?", numberOfTags):
@@ -179,14 +179,14 @@ proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
         )
 
 proc getRandomIdFrom*(query: string): int  =
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select id From root_query Order By Random() Limit 1"
     return db.getValue(cxquery.sql()).parseInt()
 
 proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     result = @[]
@@ -203,7 +203,7 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
         )
 
 proc getAllTags*(): seq[TagTuple]  =
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     result = @[]
@@ -237,7 +237,7 @@ proc buildSearchQuery*(
             includes: seq[int] = @[]
             excludes: seq[int] = @[]
 
-        let db = open(dbFile, "", "", "")
+        let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
         defer: db.close()
 
         for q in query.split(" "):
@@ -281,7 +281,7 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
     log.logScope:
         topics = "getTagAutocompletes"
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     result = @[]

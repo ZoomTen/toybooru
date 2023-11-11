@@ -22,7 +22,7 @@ proc imageTable*() =
         topics = "setup.imageTable"
 
     # setup sqlite db
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     db.exec(sql"""
@@ -41,7 +41,7 @@ proc tagTable*() =
         topics = "setup.tagTable"
 
     # setup sqlite db
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     db.exec(sql"""
@@ -68,7 +68,7 @@ proc userTable*()  =
     log.logScope:
         topics = "setup.userTable"
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer:
         db.close()
 
@@ -89,7 +89,7 @@ proc userBlacklistsTable*()  =
     log.logScope:
         topics = "setup.userBlacklistsTable"
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     db.exec(sql"""
@@ -105,7 +105,7 @@ proc imagePhashesTable*()  =
     log.logScope:
         topics = "setup.imagePhashesTable"
 
-    let db = open(dbFile, "", "", "")
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
     db.exec(sql"""
@@ -121,7 +121,7 @@ proc sessionTable*()  =
     log.logScope:
         topics = "setup.sessionTable"
 
-    let sessDb = open(sessionDbFile, "", "", "")
+    let sessDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     defer:
         sessDb.close()
 
