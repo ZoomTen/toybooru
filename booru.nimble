@@ -17,6 +17,7 @@ requires "nim >= 1.6.14"
 # Server dependencies
 
 requires [
+    "httpbeast#17e322b",
     "jester#185c610",
     "karax#2371ea3",
     "stbimage#ba5f4528",
