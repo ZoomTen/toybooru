@@ -106,7 +106,7 @@ proc getCurrentUser*(sessId: string): Option[User]  =
     sessDb.exec(sql"PRAGMA foreign_keys = ON")
 
     let userId = sessDb.getValue(
-        sql"Select user_id From session_user Where sid = ?",
+        sql"Select user_id From sessions_users Where sid = ?",
         sessId
     )
 
@@ -317,7 +317,7 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
         return
 
     sessionDb.exec(
-        sql"Insert Into session_user(sid, user_id) Values (?, ?)",
+        sql"Insert Into sessions_users(sid, user_id) Values (?, ?)",
         sessId, user.id
     )
     log.debug("Someone has logged in", sessId=sessId, userName=user.name)

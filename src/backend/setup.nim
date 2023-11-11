@@ -1,10 +1,16 @@
 import std/os
 import ../settings
 
-when NimMajor > 1:
-    import db_connector/db_sqlite
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
 else:
-    import std/db_sqlite
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
 
 import chronicles as log
 
@@ -25,15 +31,26 @@ proc imageTable*() =
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
-    db.exec(sql"""
-    Create Table If Not Exists images (
-        id      Integer Primary Key AutoIncrement,
-        hash    VarChar(32) Not Null,
-        format  VarChar(3) Not Null,
-        width   Integer,
-        height  Integer
-    )
-    """)
+    when defined(usePostgres):
+        db.exec(sql"""
+        Create Table If Not Exists images (
+            id      Serial Primary Key,
+            hash    VarChar(32) Not Null,
+            format  VarChar(3) Not Null,
+            width   Integer,
+            height  Integer
+        )
+        """)
+    else:
+        db.exec(sql"""
+        Create Table If Not Exists images (
+            id      Integer Primary Key AutoIncrement,
+            hash    VarChar(32) Not Null,
+            format  VarChar(3) Not Null,
+            width   Integer,
+            height  Integer
+        )
+        """)
     log.info("Initialized image table")
 
 proc tagTable*() =
@@ -44,13 +61,22 @@ proc tagTable*() =
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
-    db.exec(sql"""
-    Create Table If Not Exists tags (
-        id      Integer Primary Key AutoIncrement,
-        tag     VarChar(128) Not Null Unique,
-        count   Integer Not Null Default 0
-    )
-    """)
+    when defined(usePostgres):
+        db.exec(sql"""
+        Create Table If Not Exists tags (
+            id      Serial Primary Key,
+            tag     VarChar(128) Not Null Unique,
+            count   Integer Not Null Default 0
+        )
+        """)
+    else:
+        db.exec(sql"""
+        Create Table If Not Exists tags (
+            id      Integer Primary Key AutoIncrement,
+            tag     VarChar(128) Not Null Unique,
+            count   Integer Not Null Default 0
+        )
+        """)
     log.info("Initialized tag table")
 
     db.exec(sql"""
@@ -73,15 +99,26 @@ proc userTable*()  =
         db.close()
 
     # create table of users
-    db.exec(sql"""
-        Create Table If Not Exists users (
-            id Integer Primary Key AutoIncrement,
-            username Text Not Null Unique,
-            password Text Not Null,
-            joined_on Integer Default 0, -- Unix time
-            logged_in Integer Default 0 -- Unix time
-        )
-    """)
+    when defined(usePostgres):
+        db.exec(sql"""
+            Create Table If Not Exists users (
+                id Serial Primary Key,
+                username Text Not Null Unique,
+                password Text Not Null,
+                joined_on Integer Default 0, -- Unix time
+                logged_in Integer Default 0 -- Unix time
+            )
+        """)
+    else:
+        db.exec(sql"""
+            Create Table If Not Exists users (
+                id Integer Primary Key AutoIncrement,
+                username Text Not Null Unique,
+                password Text Not Null,
+                joined_on Integer Default 0, -- Unix time
+                logged_in Integer Default 0 -- Unix time
+            )
+        """)
 
     log.info("Initialized users table")
 
@@ -127,7 +164,7 @@ proc sessionTable*()  =
 
     sessDb.exec(sql"""
         Create Table If Not Exists sessions (
-            sid Text Primary Key Not Null Default "_",
+            sid Text Primary Key Not Null Default '',
             expires Integer Default 0 -- Unix time, 0 means infinite
         )
     """)
@@ -135,7 +172,7 @@ proc sessionTable*()  =
 
     # relating users with sessions
     sessDb.exec(sql"""
-        Create Table If Not Exists session_user (
+        Create Table If Not Exists sessions_users (
             sid Text Not Null,
             user_id Integer Not Null,
             Foreign Key (sid) References sessions(sid) On Delete Cascade,
