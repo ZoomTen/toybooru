@@ -34,7 +34,7 @@ proc imageTable*() =
     when defined(usePostgres):
         db.exec(sql"""
         Create Table If Not Exists images (
-            id      Serial Primary Key,
+            id      Integer Primary Key Generated Always As Identity,
             hash    VarChar(32) Not Null,
             format  VarChar(3) Not Null,
             width   Integer,
@@ -64,7 +64,7 @@ proc tagTable*() =
     when defined(usePostgres):
         db.exec(sql"""
         Create Table If Not Exists tags (
-            id      Serial Primary Key,
+            id      Integer Primary Key Generated Always As Identity,
             tag     VarChar(128) Not Null Unique,
             count   Integer Not Null Default 0
         )
@@ -102,7 +102,7 @@ proc userTable*()  =
     when defined(usePostgres):
         db.exec(sql"""
             Create Table If Not Exists users (
-                id Serial Primary Key,
+                id Integer Primary Key Generated Always As Identity,
                 username Text Not Null Unique,
                 password Text Not Null,
                 joined_on Integer Default 0, -- Unix time
