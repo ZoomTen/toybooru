@@ -36,7 +36,7 @@ proc imageTable*() =
         Create Table If Not Exists images (
             id      Integer Primary Key Generated Always As Identity,
             hash    VarChar(32) Not Null,
-            format  VarChar(3) Not Null,
+            format  VarChar(32) Not Null,
             width   Integer,
             height  Integer
         )
@@ -46,7 +46,7 @@ proc imageTable*() =
         Create Table If Not Exists images (
             id      Integer Primary Key AutoIncrement,
             hash    VarChar(32) Not Null,
-            format  VarChar(3) Not Null,
+            format  VarChar(32) Not Null,
             width   Integer,
             height  Integer
         )
