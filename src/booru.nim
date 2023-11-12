@@ -296,5 +296,6 @@ when isMainModule:
     setup.userBlacklistsTable()
     setup.imagePhashesTable()
     setup.sessionTable()
+    upload.refreshTagCounts()
     serverMain()
     auth.invalidateExpiredSessions()

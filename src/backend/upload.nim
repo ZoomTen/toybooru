@@ -9,12 +9,21 @@ import chronicles as log
 
 import std/[tables, strutils, os, osproc, sequtils]
 
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
+else:
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
+
 when NimMajor > 1:
-    import db_connector/db_sqlite
     import checksums/md5
 else:
     import std/md5
-    import std/db_sqlite
 
 import ./pHashes as phash
 
@@ -46,9 +55,12 @@ proc clearTags*(imageId: int)  =
     db.exec(sql"Delete From image_tags Where image_id = ?", imageId)
 
 proc refreshTagCounts*()  =
+    log.logScope:
+        topics = "upload.refreshTagCounts"
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
-    for row in db.instantRows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
+    for row in db.rows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
+        log.debug("Refresh tag count", tagId=row[0], count=row[1])
         db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
 
 proc assignTags*(imageId: int, t: string)  =
@@ -112,6 +124,8 @@ proc genThumbSize(width, height: int): array[0..1, int] =
 proc processFile*(file: FileUploadRef, tags: string) {.raises:[
     BooruException, STBIException, IOError, OSError, Exception
 ].} =
+    # TODO: transactionize this; image analysis is done first, try insert to table and only after it's successful, will the files be uploaded (?)
+    
     log.logScope:
         topics = "upload.processFile"
     let mimeMappings = makeMimeMappings()

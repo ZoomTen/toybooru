@@ -11,10 +11,16 @@ import ../backend/authentication as auth
 import ../backend/userConfig as config
 import ../settings
 
-when NimMajor > 1:
-    import db_connector/db_sqlite
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
 else:
-    import std/db_sqlite
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
 
 import chronicles as log
 

@@ -148,7 +148,7 @@ proc imagePhashesTable*()  =
     db.exec(sql"""
         Create Table If Not Exists image_phashes (
             image_id Integer Not Null Unique,
-            phash Integer Not Null,
+            phash BigInt Not Null,
             Foreign Key (image_id) References images(id) On Delete Cascade
         )
     """)

@@ -17,7 +17,14 @@ Clean the database by
 nimble cleanDb
 ```
 
-**Requires devel packages for: SQLite ≥ 3.39.0, libsodium**
+**Requires devel packages for: libsodium**
+
+Database support:
+
+* SQLite ≥ 3.39.0 (**Not recommended to use threads**, add `--threads:off` to the `start` task)
+* PostgreSQL (add `-d:usePostgres` to the `start` task in the nimblefile)
+
+Configuration is hard-coded for now, look at `src/settings.nim`.
 
 ## What's here?
 

@@ -5,12 +5,19 @@ import std/[
 import ./validation as validate
 import ./exceptions
 
-when NimMajor > 1:
-    import db_connector/db_sqlite
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
 else:
-    import std/db_sqlite
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
 
-import ../helpers/sqliteLoadExt
+when not defined(usePostgres):
+    import ../helpers/sqliteLoadExt
 
 import chronicles as log
 
@@ -26,12 +33,20 @@ type
 ## Get query as a sequence of ImageEntryRef, must match the column *order*
 ## of the images table.
 proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
+    log.logScope:
+        topics = "getQueried"
     result = @[]
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
-    assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
-    assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
+    when not defined(usePostgres):
+        assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
+        assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
+    
+    log.debug("Get query as images", query=query)
+    
+    if query.strip() == "":
+        return result
 
     for row in db.instantRows(query.sql(), args):
         result.add(
@@ -116,7 +131,9 @@ proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string 
     query &= " Select images.* From include_and Inner Join images On image_id = images.id"
 
     if excludes.len() >= 1:
-        query &= " Where image_id Not In exclude_or"
+        # sqlite is fine with "Not In <aliased subquery>"
+        # but postgres seems to require me to spell it out by "Not In (Select <a column> From <aliased subquery>)"
+        query &= " Where image_id Not In (Select image_id From exclude_or)"
 
     log.debug(
         "Resulting query",
@@ -161,8 +178,9 @@ proc getCountOfQuery*(query: string): int  =
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
 
-    assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
-    assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
+    when not defined(usePostgres):
+        assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
+        assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
 
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select Count(1) From root_query"
@@ -268,12 +286,12 @@ proc buildSearchQuery*(
                 except ValueError:
                     log.debug("Keyword not found", keyword=queryElement)
                     discard
-
+        #[
         if includes.len() == 0 and excludes.len() == 0:
             # if there are no matches, just say so
             log.debug("No matches, returning empty query")
             return ""
-
+        ]#
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
@@ -300,10 +318,20 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
         return result
 
 proc buildImageSimilarityQuery*(image: ImageEntryRef, maxDistance: int = 64): string =
-    return """
-        Select id, hash, format, width, height From (
-            Select image_id, popcount((comparator | phash) - (comparator & phash)) as distance From
-                (Select phash As comparator From image_phashes Where image_id = """ & $(image.id) & """)
-                Cross Join image_phashes
-        ) Left Join images on image_id = images.id Where distance < """ & $maxDistance & """ Order by distance Asc
-    """
+    when defined(usePostgres):
+        return """
+            Select id, hash, format, width, height From (
+                Select image_id, bit_count(((comparator | phash) - (comparator & phash))::bit(64)) as distance From
+                    (Select phash As comparator From image_phashes Where image_id = """ & $(image.id) & """) As compare_images
+                    Cross Join image_phashes
+            ) As most_similar
+            Left Join images on image_id = images.id Where distance < """ & $maxDistance & """ Order by distance Asc
+        """
+    else:
+        return """
+            Select id, hash, format, width, height From (
+                Select image_id, popcount((comparator | phash) - (comparator & phash)) as distance From
+                    (Select phash As comparator From image_phashes Where image_id = """ & $(image.id) & """)
+                    Cross Join image_phashes
+            ) Left Join images on image_id = images.id Where distance < """ & $maxDistance & """ Order by distance Asc
+        """

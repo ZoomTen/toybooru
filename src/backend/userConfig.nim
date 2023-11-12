@@ -6,10 +6,16 @@ import std/[
 import ../settings
 import chronicles as log
 
-when NimMajor > 1:
-    import db_connector/db_sqlite
+when defined(usePostgres):
+    when NimMajor > 1:
+        import db_connector/db_postgres
+    else:
+        import std/db_postgres
 else:
-    import std/db_sqlite
+    when NimMajor > 1:
+        import db_connector/db_sqlite
+    else:
+        import std/db_sqlite
 
 proc getBlacklistConfig*(user: User): string =
     ## Fetches the raw blacklist config straight from the DB
