@@ -84,7 +84,7 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     Inner Join images On image_id = images.id
     Where image_id Not In exclude_or
 ]#
-proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string =
+proc buildTagQuery*(includes: seq[string] = @[], excludes: seq[string] = @[]): string =
     log.logScope:
         topics = "buildTagQuery"
 
@@ -104,7 +104,7 @@ proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string 
         query = "With include_and As ( With "
         let includesTagId = collect:
             for qIndex, tagId in includes:
-                "itag$# As (Select image_id From image_tags Where tag_id = $#)" % [
+                "itag$# As (Select image_id From image_tags Where tag_id = (Select id From tags Where tag = '$#'))" % [
                     $qIndex, $tagId
                 ]
         query &= includesTagId.join(",")
@@ -119,10 +119,12 @@ proc buildTagQuery*(includes: seq[int] = @[], excludes: seq[int] = @[]): string 
     if excludes.len() >= 1:
         query &= ", exclude_or As ( With "
         query &= "xtags As ( Select image_id From image_tags Where tag_id In ("
+        query &= "( Select id From tags Where tag In ("
         let excludesTagId = collect:
             for qIndex, tagId in excludes:
-                $tagId
+                "'" & $tagId & "'"
         query &= excludesTagId.join(",")
+        query &= "))"
         query &= "))"
         query &= " Select image_tags.image_id From image_tags"
         query &= " Right Join xtags On image_tags.image_id = xtags.image_id"
@@ -183,7 +185,7 @@ proc getCountOfQuery*(query: string): int  =
         assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
 
     var cxquery = "With root_query As ( " & query & " ) "
-    cxquery &= "Select Count(1) From root_query"
+    cxquery &= "Select Count(*) From root_query"
     return db.getValue(cxquery.sql()).parseInt()
 
 proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
@@ -252,8 +254,8 @@ proc buildSearchQuery*(
             return "Select * From images"
 
         var
-            includes: seq[int] = @[]
-            excludes: seq[int] = @[]
+            includes: seq[string] = @[]
+            excludes: seq[string] = @[]
 
         let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
         defer: db.close()
@@ -263,35 +265,30 @@ proc buildSearchQuery*(
             if queryElement == "": continue
             if queryElement[0] == '-':
                 queryElement = queryElement.substr(1)
+                try:
+                    queryElement = validate.sanitizeKeyword(queryElement)
+                except ValidationError:
+                    log.debug("Keyword invalid", keyword=queryElement)
+                    continue
+                
                 log.debug("Negating keyword", keyword=queryElement)
-                try:
-                    excludes.add(
-                        db.getValue(
-                            sql"Select id From tags Where tag = ?",
-                            queryElement
-                        ).parseInt()
-                    )
-                except ValueError:
-                    log.debug("Keyword not found", keyword=queryElement)
-                    discard
+                excludes.add(queryElement)
             else:
-                log.debug("Adding keyword", keyword=queryElement)
                 try:
-                    includes.add(
-                        db.getValue(
-                            sql"Select id From tags Where tag = ?",
-                            queryElement
-                        ).parseInt()
-                    )
-                except ValueError:
-                    log.debug("Keyword not found", keyword=queryElement)
-                    discard
+                    queryElement = validate.sanitizeKeyword(queryElement)
+                except ValidationError:
+                    log.debug("Keyword invalid", keyword=queryElement)
+                    continue
+                
+                log.debug("Adding keyword", keyword=queryElement)
+                includes.add(queryElement)
         #[
         if includes.len() == 0 and excludes.len() == 0:
             # if there are no matches, just say so
             log.debug("No matches, returning empty query")
             return ""
         ]#
+        log.debug("Resulting arrray", includes, excludes)
         return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection

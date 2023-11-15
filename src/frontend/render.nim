@@ -124,40 +124,25 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
                     tagEntry.toTagDisplay(query)
         a(href="/taglist"): text "View all tags"
 
-proc getImageTagsOfListSidebar*(rq: Request): VNode  =
+proc getImageTagsOfListSidebar*(rq: Request, imageList: seq[ImageEntryRef]): VNode  =
     log.logScope:
         topics = "getImageTagsOfListSidebar"
 
-    let params = rq.params
-
     log.debug("Get image tags to sidebar")
-
+    
     let
+        params = rq.params
         paramTuple = params.getVarsFromParams(auth.getSessionIdFrom(rq).getCurrentUser())
         pageNum = paramTuple.pageNum
         numResults = paramTuple.numResults
     var
         query = ""
         userQuery = ""
-        imageList: seq[ImageEntryRef] = @[]
     try:
         if paramTuple.query.strip() != "":
             query = validate.sanitizeQuery(paramTuple.query)
         if paramTuple.originalQuery.strip() != "":
             userQuery = validate.sanitizeQuery(paramTuple.originalQuery)
-        let
-            imgSqlQuery = images.buildSearchQuery(query)
-            numPages = ceilDiv(
-                images.getCountOfQuery(imgSqlQuery),
-                numResults
-            )
-        imageList = images.getQueried(
-            images.buildPageQuery(
-                imgSqlQuery,
-                pageNum=pageNum, numResults=numResults,
-                descending=true
-            )
-        )
     except ValueError as e:
         log.debug("Invalid query", query=paramTuple.query)
 
@@ -317,10 +302,12 @@ proc siteList*(rq: Request): VNode   =
         if paramTuple.originalQuery.strip() != "":
             userQuery = validate.sanitizeQuery(paramTuple.originalQuery)
         let imgSqlQuery = images.buildSearchQuery(query)
+        log.debug("Count number of pages")
         numPages = ceilDiv(
             images.getCountOfQuery(imgSqlQuery),
             numResults
         )
+        log.debug("Get image list")
         imageList = images.getQueried(
             images.buildPageQuery(
                 imgSqlQuery,
@@ -344,7 +331,7 @@ proc siteList*(rq: Request): VNode   =
                 if user.isSome():
                     uploadForm(rq)
                 if imageList.len >= 1:
-                    getImageTagsOfListSidebar(rq)
+                    getImageTagsOfListSidebar(rq, imageList)
                 relatedContent(userQuery, (imageList.len >= 1))
 
 proc siteUntagged*(rq: Request): VNode  =
