@@ -59,9 +59,13 @@ proc refreshTagCounts*()  =
         topics = "upload.refreshTagCounts"
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
-    for row in db.rows(sql"Select tag_id, Count(1) From image_tags Group By tag_id"):
-        log.debug("Refresh tag count", tagId=row[0], count=row[1])
-        db.exec(sql"Update tags Set count = ? Where id = ?", row[1], row[0])
+    db.exec(sql"""
+    Update tags Set count = tag_count.count From (
+        Select tag_id, Count(*) As count From image_tags Group By tag_id
+    ) as tag_count
+    Where tags.id = tag_count.tag_id
+    """)
+    log.debug("Refresh all tag counts")
 
 proc assignTags*(imageId: int, t: string)  =
     log.logScope:
