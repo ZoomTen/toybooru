@@ -265,7 +265,7 @@ proc processLogIn*(req: Request): tuple[
         sessionDb.close()
         userDb.close()
     when not defined(usePostgres):
-        sessDb.exec(sql"PRAGMA foreign_keys = ON")
+        sessionDb.exec(sql"PRAGMA foreign_keys = ON")
 
     var errors: seq[ref Exception] = @[]
     let
@@ -321,7 +321,7 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool) =
         sessionDb.close()
         userDb.close()
     when not defined(usePostgres):
-        sessDb.exec(sql"PRAGMA foreign_keys = ON")
+        sessionDb.exec(sql"PRAGMA foreign_keys = ON")
 
     # check if session is valid
     if sessionDb.getValue(
@@ -353,7 +353,7 @@ proc logOut*(sessId: string) =
     ## Simply deletes the session, as that'll delete everything under it too
     let sessionDb = open(sessionDbUrl, sessionDbUser, sessionDbPass, sessionDbDatabase)
     when not defined(usePostgres):
-        sessDb.exec(sql"PRAGMA foreign_keys = ON")
+        sessionDb.exec(sql"PRAGMA foreign_keys = ON")
     defer: sessionDb.close()
 
     log.debug("A user logged out", sessId=sessId)
