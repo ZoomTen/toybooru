@@ -146,13 +146,7 @@ proc getImageTagsOfListSidebar*(rq: Request, imageList: seq[ImageEntryRef]): VNo
     except ValueError as e:
         log.debug("Invalid query", query=paramTuple.query)
 
-    var totalTags: seq[TagTuple] = @[]
-
-    for img in imageList:
-        totalTags &= images.getTagsFor(img)
-
-    totalTags = totalTags.deduplicate()
-    totalTags.sort(compareTags)
+    var totalTags: seq[TagTuple] = images.getTagsForMultiple(imageList)
 
     return buildHtml(nav(class="headerBox")):
         h2: text "Tags for images in list"

@@ -222,6 +222,35 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
             (tag: row[0], count: row[1].parseInt())
         )
 
+proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): seq[TagTuple] =
+    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
+    defer: db.close()
+
+    result = @[]
+    
+    if images.len == 0:
+        return result
+    
+    # build query
+    var query = """
+        Select tags.tag, tags.count From image_tags
+        Inner Join tags On image_tags.tag_id = tags.id
+        Where image_tags.image_id In (
+    """
+    for i in 0..<images.len: # assume that ID is always gonna be a number
+        query &= $(images[i].id)
+        if i < (images.len - 1):
+            query &= ","
+    query &= ")"
+    if sorted: # deduplicated and sorted
+        query &= "Group By tag, count Order By tag Asc"
+
+    #execute it
+    for row in db.instantRows(query.sql):
+        result.add(
+            (tag: row[0], count: row[1].parseInt())
+        )
+
 proc getAllTags*(): seq[TagTuple]  =
     let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
     defer: db.close()
