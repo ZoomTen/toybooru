@@ -266,12 +266,18 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode  =
     return buildHtml(ul(class="galleryItems navLinks")):
         for img in imageList:
             li:
-                a(href="/entry/" & $img.id & queryAddition): img(
-                        src="/thumbs/" & img.hash & ".jpg",
-                        title=images.tagsAsString(
-                            images.getTagsFor(img)
+                when defined(usePostgres):
+                    # TODO: make a DB function to represent concat'd tags as a column of strings
+                    a(href="/entry/" & $img.id & queryAddition): img(
+                            src="/thumbs/" & img.hash & ".jpg"
                         )
-                    )
+                else:
+                    a(href="/entry/" & $img.id & queryAddition): img(
+                            src="/thumbs/" & img.hash & ".jpg",
+                            title=images.tagsAsString(
+                                images.getTagsFor(img)
+                            )
+                        )
 
 proc siteList*(rq: Request): VNode   =
     log.logScope:
