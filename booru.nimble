@@ -59,5 +59,8 @@ task clean, "Clean generated files":
         rmFile(binName & ".exe")
 
 task start, "Run server":
-    exec("gcc -shared -fPIC -O3 -o popcount src/sqliteExt/popcount.c")
-    exec("nimble -d:chronicles_disabled_topics:\"stdlib\" --threads:off run booru")
+    when defined(usePostgres):
+        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" -d:usePostgres run booru")
+    else:
+        exec("gcc -shared -fPIC -O3 -o popcount src/sqliteExt/popcount.c")
+        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" --threads:off run booru")

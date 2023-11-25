@@ -21,8 +21,8 @@ nimble cleanDb
 
 Database support:
 
-* SQLite ≥ 3.39.0 (**Not recommended to use threads**, add `--threads:off` to the `start` task)
-* PostgreSQL (add `-d:usePostgres` to the `start` task in the nimblefile)
+* SQLite ≥ 3.39.0 (default)
+* PostgreSQL (use `nimble -d:usePostgres start`)
 
 Configuration is hard-coded for now, look at `src/settings.nim`.
 
