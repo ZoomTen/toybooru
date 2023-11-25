@@ -6,11 +6,7 @@ import std/[
 import ../settings
 import ../backend/pHashes as phash
 import chronicles as log
-
-when NimMajor > 1:
-    import db_connector/db_sqlite
-else:
-    import std/db_sqlite
+import ../importDb
 
 {.push raises: [].}
 

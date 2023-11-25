@@ -10,17 +10,7 @@ import ../backend/validation as validate
 import ../backend/authentication as auth
 import ../backend/userConfig as config
 import ../settings
-
-when defined(usePostgres):
-    when NimMajor > 1:
-        import db_connector/db_postgres
-    else:
-        import std/db_postgres
-else:
-    when NimMajor > 1:
-        import db_connector/db_sqlite
-    else:
-        import std/db_sqlite
+import ../importDb
 
 import chronicles as log
 

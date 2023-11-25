@@ -9,16 +9,7 @@ import chronicles as log
 
 import std/[tables, strutils, os, osproc, sequtils]
 
-when defined(usePostgres):
-    when NimMajor > 1:
-        import db_connector/db_postgres
-    else:
-        import std/db_postgres
-else:
-    when NimMajor > 1:
-        import db_connector/db_sqlite
-    else:
-        import std/db_sqlite
+import ../importDb
 
 when NimMajor > 1:
     import checksums/md5

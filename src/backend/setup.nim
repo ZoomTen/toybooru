@@ -1,16 +1,6 @@
 import std/os
 import ../settings
-
-when defined(usePostgres):
-    when NimMajor > 1:
-        import db_connector/db_postgres
-    else:
-        import std/db_postgres
-else:
-    when NimMajor > 1:
-        import db_connector/db_sqlite
-    else:
-        import std/db_sqlite
+import ../importDb
 
 import chronicles as log
 
@@ -18,10 +8,11 @@ proc folders*() =
     log.logScope:
         topics = "setup.folders"
 
-    # setup image bins
-    for dir in [imgDir, thumbDir]:
-        log.info("Created image folder", dir=dir)
-        createDir(dir)
+    log.info("Created image folder")
+    createDir(imgDir)
+
+    log.info("Created thumbnail folder")
+    createDir(thumbDir)
 
 proc imageTable*() =
     log.logScope:
