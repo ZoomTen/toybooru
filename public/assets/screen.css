@@ -192,6 +192,7 @@ main h2:first-of-type {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(12em, max-content));
 	gap: 2.5em;
+	justify-items: center;
 }
 
 .galleryItems a > img {
