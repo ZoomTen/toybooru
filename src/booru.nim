@@ -89,7 +89,7 @@ router mainRouter:
         except:
             resp Http404
         resp render.masterTemplate(
-            siteContent=render.siteEntry(img,
+            siteContent=siteEntry(img,
                 rq=request
             ),
             rq=request
