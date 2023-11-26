@@ -1,87 +1,51 @@
 <!DOCTYPE html>
-<html lang="en-US"><head>
-    <meta charset="utf-8">
-    <title></title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <link rel="stylesheet" href="../public/assets/screen.css" media="screen">
-</head><body>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>toybooru</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="../public/assets/screen.css" />
+  </head>
+  <body>
     <div id="pageContainer">
-        <header>
-            <nav id="mainMenu" class="headerBox">
-                <h1>Crapbooru</h1>
-                <form action="/list" method="get" class="inputAndSubmit">
-                    <input type="search" name="search" autocomplete="off" placeholder="find some_tags">
-                    <input type="submit" value="Find">
-                </form>
-                <ul class="hidden">
-                    <li><a href="#">Skip navigation</a></li>
-                    <li><a href="#">Skip to tags</a></li>
-                </ul>
-                <ul class="navLinks">
-                    <li><a href="#">Front page</a></li>
-                    <li><a href="#">Wiki</a></li>
-                </ul>
-            </nav>
-            <form class="headerBox" action="/upload" method="post" enctype="multipart/form-data">
-                <h2>Upload<br><small>(1&ndash;50 MB)</small></h2>
-                <input name="data" type="file">
-                <div class="textAreaAndSubmit">
-                    <textarea name="tags" placeholder="tag_me and_stuff yo"></textarea>
-                    <input type="submit" value="Post">
-                </div>
+      <header><nav id="mainMenu">
+          <div id="titleAndSearch">
+            <h1>toybooru</h1>
+            <form class="inputAndSubmit" action="/list" method="get">
+              <input id="searchInput" type="search" name="q" autocomplete="off" placeholder="find some_tags" value="" />
+              <input type="submit" value="Find" />
             </form>
-            <nav class="headerBox">
-                <h2>Popular tags</h2>
-                <ul id="navTags" class="navLinks">
-                    <li>
-                        <a href="#" title="add to search">+</a>
-                        <a href="#" title="remove from search">-</a>
-                        <a href="#" title="boot up wiki page">?</a>
-                        <a href="#">lorem</a>
-                        (124)
-                    </li>
-                    <li>
-                        <a href="#" title="add to search">+</a>
-                        <a href="#" title="remove from search">-</a>
-                        <a href="#" title="boot up wiki page">?</a>
-                        <a href="#">ipsum</a>
-                        (100)
-                    </li>
-                    <li>
-                        <a href="#" title="add to search">+</a>
-                        <a href="#" title="remove from search">-</a>
-                        <a href="#" title="boot up wiki page">?</a>
-                        <a href="#">dolor_sit</a>
-                        (94)
-                    </li>
-                </ul>
-                <a href="#">View all tags</a>
-            </nav>
-        </header>
-        <main>
-            <section id="wiki">
-                <hr>
-                <hr>
-<p><strong>Advertisement 😃</strong></p>
-<ul>
-<li><strong><a href="https://nodeca.github.io/pica/demo/">pica</a></strong> - high quality and fast image
-resize in browser.</li>
-<li><strong><a href="https://github.com/nodeca/babelfish/">babelfish</a></strong> - developer friendly
-i18n with plurals support and easy syntax.</li>
+            <hr></hr>
+            <ul class="hidden">
+              <li><a href="#">Skip navigation</a></li>
+              <li><a href="#">Skip to tags</a></li>
+            </ul>
+          </div>
+          <hr></hr>
+          <ul id="headerLinks" class="navLinks">
+            <li>Hey, <a href="/config"><b>admin</b></a></li>
+            <li><a href="/logout">Log out</a></li>
+            <li><a href="/">Home</a></li>
+            <li><a href="/list">Listing</a></li>
+            <li><a href="/wiki">Wiki</a></li>
+          </ul>
+        </nav></header>
+      <main><section id="wiki">
+<div id="wikiHeader">
+          <h2>namespace: tag_name</h2>
+<ul class="navLinks" id="wikiActions">
+<li><a href="#">Edit</a></li>
+<li><a href="#">Relevant posts</a></li>
 </ul>
-<p>You will like those projects!</p>
-<hr>
-<h1>h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading h1 Heading </h1>
-<h2>h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading h2 Heading </h2>
-<h3>h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading h3 Heading </h3>
-<h4>h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading h4 Heading </h4>
-<h5>h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading h5 Heading </h5>
-<h6>h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading h6 Heading </h6>
-<h2>Horizontal Rules</h2>
-<hr>
-<hr>
-<hr>
-<h2>Typographic replacements</h2>
+</div>
+          <p>
+              This wiki page describes a specific tag from a specific namespace. You can put anything in here.
+          </p>
+          <h3>The rest of the owl</h3>
+          <p>
+              And now, the Markdown output sampler:
+          </p>
+
 <p>Enable typographer option to see result.</p>
 <p>© © ® ® ™ ™ (p) (P) ±</p>
 <p>test… test… test… test?.. test!..</p>
@@ -285,12 +249,41 @@ with lazy continuation.</p>
 <li id="fn3" class="footnote-item"><p>Text of inline footnote <a href="#fnref3" class="footnote-backref">↩︎</a></p>
 </li>
 </ol>
-</section>
-            </section>
-        </main>
+
+
+          <h3>Example images</h3>
+<p>(I kinda doubt this will work out smoothly, but it might be worth a shot…)</p> 
+
+<ul class="galleryItems navLinks">
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/100/100" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/100/100" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/100/100" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/100/100" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <img src="http://placekitten.com/g/100/100" alt="lorem ipsum dolor_sit">
+                        </a>
+                    </li>
+</ul>
+
+        </section></main>
     </div>
-    <footer>
-        <hr>
-        &copy; 2023 Zumi
-    </footer>
-</body></html>
+    <footer><hr></hr>© 2023 Zumi.</footer>
+  </body>
+</html>

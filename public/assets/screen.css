@@ -50,6 +50,7 @@ html {
 	--fg-1: #fff;
 	--fg-2: #D1CCDC;
 	--fg-3: #fff;
+	--fg-4: #81888C;
 }
 
 body {
@@ -245,12 +246,21 @@ main h2:first-of-type {
 	flex-shrink: 0;
 }
 
-#headerLinks {
+#headerLinks, #wikiActions {
 	display: flex;
 	flex-direction: row;
+	gap: 1em;
+}
+
+#headerLinks {
 	align-items: center;
 	justify-content: center;
-	gap: 1em;
+}
+
+#wikiHeader {
+	border: 1px solid var(--fg-4);
+	padding: 0 1em;
+	margin-bottom: 1em;
 }
 
 #pageNav ul {
