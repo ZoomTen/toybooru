@@ -116,9 +116,7 @@ proc genThumbSize(width, height: int): array[0..1, int] =
     else: # if tall
         result[0] = int(thumbSize.float() * (width/height))
 
-proc processFile*(file: FileUploadRef, tags: string) {.raises:[
-    BooruException, STBIException, IOError, OSError, Exception
-].} =
+proc processFile*(file: FileUploadRef, tags: string) =
     # TODO: transactionize this; image analysis is done first, try insert to table and only after it's successful, will the files be uploaded (?)
     
     log.logScope:

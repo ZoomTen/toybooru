@@ -8,8 +8,6 @@ import ../backend/pHashes as phash
 import chronicles as log
 import ../importDb
 
-{.push raises: [].}
-
 when isMainModule:
     var args = commandLineParams()
     if args.len == 1:

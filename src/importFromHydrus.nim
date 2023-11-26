@@ -5,8 +5,6 @@ import std/[
 ]
 import ./settings
 
-{.push raises: [].}
-
 when isMainModule:
     var args = commandLineParams()
     let mimes = newMimetypes()
