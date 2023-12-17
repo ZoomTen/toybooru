@@ -152,6 +152,7 @@ proc processFile*(file: FileUploadRef, tags: string) =
             exportName,
             file.contents
         )
+        exportName.inclFilePermissions({fpGroupRead, fpOthersRead})
         # make thumbnail
         if extension in ["mp4"]:
             let
@@ -192,6 +193,7 @@ proc processFile*(file: FileUploadRef, tags: string) =
                 imgData, width, height, genThumbSize[0], genThumbSize[1], channels
             )
             stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
+        thumbName.inclFilePermissions({fpGroupRead, fpOthersRead})
 
     # add new image
     imageId = db.tryInsertID(sql"""
