@@ -41,22 +41,20 @@ proc fileFromReq*(
     )
 
 proc clearTags*(imageId: int)  =
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-    db.exec(sql"Delete From image_tags Where image_id = ?", imageId)
+    withMainDb:
+        mainDb.exec(sql"Delete From image_tags Where image_id = ?", imageId)
 
 proc refreshTagCounts*()  =
     log.logScope:
         topics = "upload.refreshTagCounts"
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-    db.exec(sql"""
-    Update tags Set count = tag_count.count From (
-        Select tag_id, Count(*) As count From image_tags Group By tag_id
-    ) as tag_count
-    Where tags.id = tag_count.tag_id
-    """)
-    log.debug("Refresh all tag counts")
+    withMainDb:
+        mainDb.exec(sql"""
+        Update tags Set count = tag_count.count From (
+            Select tag_id, Count(*) As count From image_tags Group By tag_id
+        ) as tag_count
+        Where tags.id = tag_count.tag_id
+        """)
+        log.debug("Refresh all tag counts")
 
 proc assignTags*(imageId: int, t: string)  =
     log.logScope:
@@ -70,41 +68,39 @@ proc assignTags*(imageId: int, t: string)  =
 
     if tags == "": return
 
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
     # verify image exists
-    if db.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
-        raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
+    withMainDb:
+        if mainDb.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
+            raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
 
-    var tag = ""
+        var tag = ""
 
-    for rawTag in tags.split(" ").deduplicate():
-        if rawTag == "": continue
-        if rawTag[0] == '-':
-            raise newException(BooruException, "Tag " & rawTag & " cannot start with a minus!")
+        for rawTag in tags.split(" ").deduplicate():
+            if rawTag == "": continue
+            if rawTag[0] == '-':
+                raise newException(BooruException, "Tag " & rawTag & " cannot start with a minus!")
 
-        try:
-            tag = sanitizeKeyword(rawTag)
-        except ValidationError as e:
-            raise newException(BooruException, e.msg)
+            try:
+                tag = sanitizeKeyword(rawTag)
+            except ValidationError as e:
+                raise newException(BooruException, e.msg)
 
-        var tagRowId: int64
-        try: # does tag exist?
-            tagRowId = db.getValue(
-                sql"""Select id From tags Where tag = ?""", tag.strip()
-            ).parseInt()
-        except ValueError: # tag doesn't exist, so add it
-            tagRowId = db.tryInsertID(sql"""
-                Insert Into tags ("tag") Values (?)
-            """, tag.strip())
-            if tagRowId == -1:
-                raise newException(BooruException, "Failed inserting tag " & tag & " into db!")
+            var tagRowId: int64
+            try: # does tag exist?
+                tagRowId = mainDb.getValue(
+                    sql"""Select id From tags Where tag = ?""", tag.strip()
+                ).parseInt()
+            except ValueError: # tag doesn't exist, so add it
+                tagRowId = mainDb.tryInsertID(sql"""
+                    Insert Into tags ("tag") Values (?)
+                """, tag.strip())
+                if tagRowId == -1:
+                    raise newException(BooruException, "Failed inserting tag " & tag & " into db!")
 
-        # add tag to image
-        db.exec(sql"""
-            Insert Into image_tags (image_id, tag_id) Values (?, ?)
-        """, imageId, tagRowId)
+            # add tag to image
+            mainDb.exec(sql"""
+                Insert Into image_tags (image_id, tag_id) Values (?, ?)
+            """, imageId, tagRowId)
 
     log.info("Assigned tags to image", imgId=imageId, tags=t)
     refreshTagCounts()
@@ -122,7 +118,6 @@ proc processFile*(file: FileUploadRef, tags: string) =
     log.logScope:
         topics = "upload.processFile"
     let mimeMappings = makeMimeMappings()
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
 
     let hash = getMD5(file.contents)
     var
@@ -134,10 +129,10 @@ proc processFile*(file: FileUploadRef, tags: string) =
     except KeyError:
         raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png, mp4.")
 
-    let hashExists = db.getValue(sql"Select id From images Where hash = ?", hash)
-
-    if hashExists != "":
-        raise newException(BooruException, "An image with this hash already exists: " & hashExists)
+    withMainDb:
+        let hashExists = mainDb.getValue(sql"Select id From images Where hash = ?", hash)
+        if hashExists != "":
+            raise newException(BooruException, "An image with this hash already exists: " & hashExists)
 
     var
         width = 0
@@ -195,20 +190,19 @@ proc processFile*(file: FileUploadRef, tags: string) =
             stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
         thumbName.inclFilePermissions({fpGroupRead, fpOthersRead})
 
-    # add new image
-    imageId = db.tryInsertID(sql"""
-            Insert Into images (hash, format, width, height) Values (?, ?, ?, ?)
-    """, hash, file.mime, width, height)
+        # add new image
+        withMainDb:
+            imageId = mainDb.tryInsertID(sql"""
+                    Insert Into images (hash, format, width, height) Values (?, ?, ?, ?)
+            """, hash, file.mime, width, height)
 
-    if imageId == -1:
-        raise newException(BooruException, "Failed inserting image into db!")
+            if imageId == -1:
+                raise newException(BooruException, "Failed inserting image into db!")
 
-    if not (extension in ["mp4"]):
-        let pHash = phash.pHash(file.contents)
-        db.exec(sql"Insert Into image_phashes(image_id, phash) Values (?, ?)", imageId, pHash)
-        log.info("Assigned hash to new image", imgId=imageId, hash=pHash)
-
-    db.close()
+            if not (extension in ["mp4"]):
+                let pHash = phash.pHash(file.contents)
+                mainDb.exec(sql"Insert Into image_phashes(image_id, phash) Values (?, ?)", imageId, pHash)
+                log.info("Assigned hash to new image", imgId=imageId, hash=pHash)
 
     log.info("Added new image", imgId=imageId)
     imageId.int.assignTags(tags)
@@ -218,20 +212,20 @@ proc deleteImage*(imageId: int)  =
         topics = "upload.deleteImage"
 
     let mimeMappings = makeMimeMappings()
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-    let row = db.getRow(sql"Select hash, format From images Where id = ?", $imageId)
-    if row != @[]:
-        # delete the file first
-        let
-            hash = row[0]
-            extension = mimeMappings[row[1]]
-        removeFile(imgDir & "/" & hash & "." & extension) # exportName
-        removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
-        # then delete it from the db
-        db.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
-        db.exec(sql"Delete From image_phashes Where image_id = ?", $imageId)
-        db.exec(sql"Delete From images Where id = ?", $imageId)
-        log.info("Image deleted", imgId=imageId)
-    else:
-        raise newException(BooruException, "Invalid image")
+
+    withMainDb:
+        let row = mainDb.getRow(sql"Select hash, format From images Where id = ?", $imageId)
+        if row != @[]:
+            # delete the file first
+            let
+                hash = row[0]
+                extension = mimeMappings[row[1]]
+            removeFile(imgDir & "/" & hash & "." & extension) # exportName
+            removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
+            # then delete it from the db
+            mainDb.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
+            mainDb.exec(sql"Delete From image_phashes Where image_id = ?", $imageId)
+            mainDb.exec(sql"Delete From images Where id = ?", $imageId)
+            log.info("Image deleted", imgId=imageId)
+        else:
+            raise newException(BooruException, "Invalid image")

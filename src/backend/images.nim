@@ -26,30 +26,29 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     log.logScope:
         topics = "getQueried"
     result = @[]
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
 
-    when not defined(usePostgres):
-        assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
-        assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
-    
-    log.debug("Get query as images", query=query)
-    
-    if query.strip() == "":
-        return result
+    withMainDb:
+        when not defined(usePostgres):
+            assert mainDb.enableExtensions() == 0, "Failed to enable sqlite extensions"
+            assert mainDb.loadExtension("./popcount") == 0, "Failed to load popcount extension"
 
-    for row in db.instantRows(query.sql(), args):
-        result.add(
-            ImageEntryRef(
-                id: row[0].parseInt(),
-                hash: row[1],
-                formatMime: row[2],
-                dimensions: (
-                    row[3].parseInt(),
-                    row[4].parseInt()
+        log.debug("Get query as images", query=query)
+
+        if query.strip() == "":
+            return result
+
+        for row in mainDb.instantRows(query.sql(), args):
+            result.add(
+                ImageEntryRef(
+                    id: row[0].parseInt(),
+                    hash: row[1],
+                    formatMime: row[2],
+                    dimensions: (
+                        row[3].parseInt(),
+                        row[4].parseInt()
+                    )
                 )
             )
-        )
 
 ## Int is for ImageEntryRef id's
 #[
@@ -167,55 +166,50 @@ proc getCountOfQuery*(query: string): int  =
     if query == "":
         return 0
 
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
+    withMainDb:
+        when not defined(usePostgres):
+            assert mainDb.enableExtensions() == 0, "Failed to enable sqlite extensions"
+            assert mainDb.loadExtension("./popcount") == 0, "Failed to load popcount extension"
 
-    when not defined(usePostgres):
-        assert db.enableExtensions() == 0, "Failed to enable sqlite extensions"
-        assert db.loadExtension("./popcount") == 0, "Failed to load popcount extension"
-
-    var cxquery = "With root_query As ( " & query & " ) "
-    cxquery &= "Select Count(*) From root_query"
-    return db.getValue(cxquery.sql()).parseInt()
+        var cxquery = "With root_query As ( " & query & " ) "
+        cxquery &= "Select Count(*) From root_query"
+        return mainDb.getValue(cxquery.sql()).parseInt()
 
 proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
     result = @[]
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
 
-    for row in db.instantRows(sql"Select tag, count From tags Order By count Desc Limit ?", numberOfTags):
-        result.add(
-            (tag: row[0], count: row[1].parseInt())
-        )
+    withMainDb:
+        for row in mainDb.instantRows(
+            sql"Select tag, count From tags Order By count Desc Limit ?",
+            numberOfTags
+        ):
+            result.add(
+                (tag: row[0], count: row[1].parseInt())
+            )
 
 proc getRandomIdFrom*(query: string): int  =
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select id From root_query Order By Random() Limit 1"
-    return db.getValue(cxquery.sql()).parseInt()
+
+    withMainDb:
+        return mainDb.getValue(cxquery.sql()).parseInt()
 
 proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
     result = @[]
 
-    for row in db.instantRows(
-        sql"""
-            Select tags.tag, tags.count From image_tags
-            Inner Join tags On image_tags.tag_id = tags.id
-            Where image_tags.image_id = ?
-        """, $image.id
-    ):
-        result.add(
-            (tag: row[0], count: row[1].parseInt())
-        )
+    withMainDb:
+        for row in mainDb.instantRows(
+            sql"""
+                Select tags.tag, tags.count From image_tags
+                Inner Join tags On image_tags.tag_id = tags.id
+                Where image_tags.image_id = ?
+            """, $image.id
+        ):
+            result.add(
+                (tag: row[0], count: row[1].parseInt())
+            )
 
 proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): seq[TagTuple] =
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
     result = @[]
     
     if images.len == 0:
@@ -236,21 +230,22 @@ proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): seq[T
         query &= "Group By tag, count Order By tag Asc"
 
     #execute it
-    for row in db.instantRows(query.sql):
-        result.add(
-            (tag: row[0], count: row[1].parseInt())
-        )
+    withMainDb:
+        for row in mainDb.instantRows(query.sql):
+            result.add(
+                (tag: row[0], count: row[1].parseInt())
+            )
 
 proc getAllTags*(): seq[TagTuple]  =
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
     result = @[]
 
-    for row in db.instantRows(sql"Select tag, count From tags Order By tag Asc"):
-        result.add(
-            (tag: row[0], count: row[1].parseInt())
-        )
+    withMainDb:
+        for row in mainDb.instantRows(
+            sql"Select tag, count From tags Order By tag Asc"
+        ):
+            result.add(
+                (tag: row[0], count: row[1].parseInt())
+            )
 
 proc tagsAsString*(tags: seq[TagTuple]): string =
     var st: seq[string]
@@ -259,76 +254,72 @@ proc tagsAsString*(tags: seq[TagTuple]): string =
     return st.join(" ")
 
 proc buildSearchQuery*(
-        query: string = "",
-        pageNum:int = 0,
-        numResults:int = defaultNumResults
-    ): string =
-        log.logScope:
-            topics = "buildSearchQuery"
+    query: string = "",
+    pageNum:int = 0,
+    numResults:int = defaultNumResults
+): string =
+    log.logScope:
+        topics = "buildSearchQuery"
 
-        log.debug("Query input", query=query)
+    log.debug("Query input", query=query)
 
-        if query.strip() == "":
-            log.debug("Empty query, selecting all images")
-            return "Select * From images"
+    if query.strip() == "":
+        log.debug("Empty query, selecting all images")
+        return "Select * From images"
 
-        var
-            includes: seq[string] = @[]
-            excludes: seq[string] = @[]
+    var
+        includes: seq[string] = @[]
+        excludes: seq[string] = @[]
 
-        let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-        defer: db.close()
+    for q in query.split(" "):
+        var queryElement = q.strip()
+        if queryElement == "": continue
+        if queryElement[0] == '-':
+            queryElement = queryElement.substr(1)
+            try:
+                queryElement = validate.sanitizeKeyword(queryElement)
+            except ValidationError:
+                log.debug("Keyword invalid", keyword=queryElement)
+                continue
 
-        for q in query.split(" "):
-            var queryElement = q.strip()
-            if queryElement == "": continue
-            if queryElement[0] == '-':
-                queryElement = queryElement.substr(1)
-                try:
-                    queryElement = validate.sanitizeKeyword(queryElement)
-                except ValidationError:
-                    log.debug("Keyword invalid", keyword=queryElement)
-                    continue
-                
-                log.debug("Negating keyword", keyword=queryElement)
-                excludes.add(queryElement)
-            else:
-                try:
-                    queryElement = validate.sanitizeKeyword(queryElement)
-                except ValidationError:
-                    log.debug("Keyword invalid", keyword=queryElement)
-                    continue
-                
-                log.debug("Adding keyword", keyword=queryElement)
-                includes.add(queryElement)
-        #[
-        if includes.len() == 0 and excludes.len() == 0:
-            # if there are no matches, just say so
-            log.debug("No matches, returning empty query")
-            return ""
-        ]#
-        log.debug("Resulting arrray", includes, excludes)
-        return images.buildTagQuery(includes=includes, excludes=excludes)
+            log.debug("Negating keyword", keyword=queryElement)
+            excludes.add(queryElement)
+        else:
+            try:
+                queryElement = validate.sanitizeKeyword(queryElement)
+            except ValidationError:
+                log.debug("Keyword invalid", keyword=queryElement)
+                continue
+
+            log.debug("Adding keyword", keyword=queryElement)
+            includes.add(queryElement)
+    #[
+    if includes.len() == 0 and excludes.len() == 0:
+        # if there are no matches, just say so
+        log.debug("No matches, returning empty query")
+        return ""
+    ]#
+    log.debug("Resulting arrray", includes, excludes)
+    return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
 proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
     log.logScope:
         topics = "getTagAutocompletes"
 
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
     result = @[]
 
     try:
         let kw = validate.sanitizeKeyword(keyword)
         # need keyword sanitization
-        for row in db.instantRows(
-            sql("Select tag, count From tags Where tag Like \"%" & kw & "%\" Order By tag Asc")
-        ):
-            result.add(
-                (tag: row[0], count: row[1].parseInt())
-            )
+
+        withMainDb:
+            for row in mainDb.instantRows(
+                sql("Select tag, count From tags Where tag Like \"%" & kw & "%\" Order By tag Asc")
+            ):
+                result.add(
+                    (tag: row[0], count: row[1].parseInt())
+                )
     except ValidationError:
         log.debug("Keyword invalid", keyword=keyword)
         return result

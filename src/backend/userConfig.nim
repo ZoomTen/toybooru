@@ -9,23 +9,19 @@ import ../importDb
 
 proc getBlacklistConfig*(user: User): string =
     ## Fetches the raw blacklist config straight from the DB
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
-    return db.getValue(
-        sql"Select blacklist From user_blacklists Where user_id = ?",
-        $(user.id)
-    ).strip()
+    withMainDb:
+        return mainDb.getValue(
+            sql"Select blacklist From user_blacklists Where user_id = ?",
+            $(user.id)
+        ).strip()
 
 proc setBlacklistConfig*(user: User, blklist: string)  =
     ## Sets raw blacklist config
-    let db = open(mainDbUrl, mainDbUser, mainDbPass, mainDbDatabase)
-    defer: db.close()
-
-    db.exec(
-        sql"Update user_blacklists Set blacklist = ? Where user_id = ?",
-        blklist, $(user.id)
-    )
+    withMainDb:
+        mainDb.exec(
+            sql"Update user_blacklists Set blacklist = ? Where user_id = ?",
+            blklist, $(user.id)
+        )
 
 proc processSetBlacklistConfig*(user: User, rq: Request) =
     log.logScope:
