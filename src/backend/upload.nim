@@ -45,8 +45,6 @@ proc clearTags*(imageId: int)  =
         mainDb.exec(sql"Delete From image_tags Where image_id = ?", imageId)
 
 proc refreshTagCounts*()  =
-    log.logScope:
-        topics = "upload.refreshTagCounts"
     withMainDb:
         mainDb.exec(sql"""
         Update tags Set count = tag_count.count From (
@@ -57,8 +55,6 @@ proc refreshTagCounts*()  =
         log.debug("Refresh all tag counts")
 
 proc assignTags*(imageId: int, t: string)  =
-    log.logScope:
-        topics = "upload.assignTags"
     var tags = ""
 
     try:
@@ -115,8 +111,6 @@ proc genThumbSize(width, height: int): array[0..1, int] =
 proc processFile*(file: FileUploadRef, tags: string) =
     # TODO: transactionize this; image analysis is done first, try insert to table and only after it's successful, will the files be uploaded (?)
     
-    log.logScope:
-        topics = "upload.processFile"
     let mimeMappings = makeMimeMappings()
 
     let hash = getMD5(file.contents)
@@ -208,9 +202,6 @@ proc processFile*(file: FileUploadRef, tags: string) =
     imageId.int.assignTags(tags)
 
 proc deleteImage*(imageId: int)  =
-    log.logScope:
-        topics = "upload.deleteImage"
-
     let mimeMappings = makeMimeMappings()
 
     withMainDb:

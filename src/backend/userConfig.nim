@@ -24,8 +24,6 @@ proc setBlacklistConfig*(user: User, blklist: string)  =
         )
 
 proc processSetBlacklistConfig*(user: User, rq: Request) =
-    log.logScope:
-        topics = "processSetBlacklistConfig"
     let newBlacklist = rq.params.getOrDefault(blacklistFieldName, "")
     user.setBlacklistConfig(newBlacklist.strip())
     log.debug("Set blacklist", userName=user.name, newBlacklist=newBlacklist)

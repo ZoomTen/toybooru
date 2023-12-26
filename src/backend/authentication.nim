@@ -25,9 +25,6 @@ type
 
 proc toSessId*(req: Request): string =
     ## Basically PHPSESSID's algorithm.
-    log.logScope:
-        topics = "toSessId"
-
     var r = initRand()
     try:
         return "$# $# $#" % [
@@ -43,9 +40,6 @@ proc toHashed*(s: string): string =
     ).toHex().toLower()
 
 proc invalidateExpiredSessions*(): void =
-    log.logScope:
-        topics = "invalidateExpiredSessions"
-
     withSessionDb:
         let numDeletedSessions = sessDb.execAffectedRows(
         sql"Delete From sessions Where (expires < ? and expires != 0)",
@@ -56,9 +50,6 @@ proc invalidateExpiredSessions*(): void =
             log.debug "Deleted expired sessions", numSessions=numDeletedSessions
 
 proc getSessionIdFrom*(req: Request): string =
-    log.logScope:
-        topics = "getSessionIdFrom"
-
     # get cookie parameter from the session
     let cookieParam = req.cookies.getOrDefault(sessionCookieName, "")
 
@@ -84,9 +75,6 @@ proc userFromRow(user: Row): User =
     )
 
 proc getCurrentUser*(sessId: string): Option[User]  =
-    log.logScope:
-        topics = "getCurrentUser"
-
     var userId: string
 
     withSessionDb:
@@ -112,9 +100,6 @@ proc getCurrentUser*(sessId: string): Option[User]  =
         return some(userFromRow(user))
 
 proc setNewAcsrfToken*(sessId: string): string  =
-    log.logScope:
-        topics = "setNewAcsrfToken"
-
     # generate new ACSRF string
     let acsrfString = randombytes(16).toHex().toLower()
 
@@ -206,9 +191,6 @@ proc processLogIn*(req: Request): tuple[
     alreadyLoggedIn: bool,
     dontAutoLogOut: bool
 ] =
-    log.logScope:
-        topics = "processLogIn"
-
     const genericUnameOrPwInvalidMsg = "Username or password invalid"
 
     let existingUser = getSessionIdFrom(req).getCurrentUser()
@@ -270,9 +252,6 @@ proc processLogIn*(req: Request): tuple[
         )
 
 proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool): void =
-    log.logScope:
-        topics = "doLogIn"
-
     withSessionDb:
         # check if session is valid
         if sessDb.getValue(

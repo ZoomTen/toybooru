@@ -4,9 +4,6 @@ import karax/[
 ]
 
 proc exception*(exception: ref Exception): VNode =
-    log.logScope:
-        topics = "exception"
-
     log.error("Exception occured!", name=exception.name, message=exception.msg)
 
     return buildHtml(main):

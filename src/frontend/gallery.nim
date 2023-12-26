@@ -62,9 +62,6 @@ proc getImageTagsSidebar*(img: ImageEntryRef, query: string=""): VNode =
         a(href="/taglist"): text "View all tags"
 
 proc getImageTagsOfListSidebar*(rq: Request, imageList: seq[ImageEntryRef]): VNode  =
-    log.logScope:
-        topics = "getImageTagsOfListSidebar"
-
     log.debug("Get image tags to sidebar")
 
     let
@@ -183,9 +180,6 @@ proc buildGallery(imageList: seq[ImageEntryRef], query: string = ""): VNode  =
                         )
 
 proc siteList*(rq: Request): VNode   =
-    log.logScope:
-        topics = "siteList"
-
     log.debug("Get images to gallery display")
 
     let

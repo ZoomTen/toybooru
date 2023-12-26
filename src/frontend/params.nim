@@ -16,9 +16,6 @@ type
         distance: int
 
 proc getVarsFromParams*(params: Table, user: Option[auth.User]): PageVars =
-    log.logScope:
-        topics = "getVarsFromParams"
-
     let blacklistDef = if user.isNone():
         try:
             log.debug("Default blacklist set",

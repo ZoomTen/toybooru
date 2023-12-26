@@ -60,7 +60,7 @@ task clean, "Clean generated files":
 
 task start, "Run server":
     when defined(usePostgres):
-        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" -d:usePostgres run booru")
+        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" -d:chronicles_line_numbers -d:usePostgres run booru")
     else:
         exec("gcc -shared -fPIC -O3 -o popcount src/sqliteExt/popcount.c")
-        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" --threads:off run booru")
+        exec("nimble -d:chronicles_disabled_topics:\"stdlib\" -d:chronicles_line_numbers --threads:off run booru")

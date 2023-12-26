@@ -5,9 +5,6 @@ import ../importDb
 import chronicles as log
 
 proc folders*() =
-    log.logScope:
-        topics = "setup.folders"
-
     log.info("Created image folder")
     createDir(imgDir)
 
@@ -15,9 +12,6 @@ proc folders*() =
     createDir(thumbDir)
 
 proc imageTable*() =
-    log.logScope:
-        topics = "setup.imageTable"
-
     withMainDb:
         when defined(usePostgres):
             mainDb.exec(sql"""
@@ -42,9 +36,6 @@ proc imageTable*() =
         log.info("Initialized image table")
 
 proc tagTable*() =
-    log.logScope:
-        topics = "setup.tagTable"
-
     withMainDb:
         when defined(usePostgres):
             mainDb.exec(sql"""
@@ -76,9 +67,6 @@ proc tagTable*() =
         log.info("Initialized image/tag relation table")
 
 proc userTable*()  =
-    log.logScope:
-        topics = "setup.userTable"
-
     # create table of users
     withMainDb:
         when defined(usePostgres):
@@ -105,9 +93,6 @@ proc userTable*()  =
         log.info("Initialized users table")
 
 proc userBlacklistsTable*()  =
-    log.logScope:
-        topics = "setup.userBlacklistsTable"
-
     withMainDb:
         mainDb.exec(sql"""
             Create Table If Not Exists user_blacklists (
@@ -119,9 +104,6 @@ proc userBlacklistsTable*()  =
         log.info("Initialized user blacklists table")
 
 proc imagePhashesTable*()  =
-    log.logScope:
-        topics = "setup.imagePhashesTable"
-
     withMainDb:
         mainDb.exec(sql"""
             Create Table If Not Exists image_phashes (
@@ -133,9 +115,6 @@ proc imagePhashesTable*()  =
         log.info("Initialized image perceptual hashes table")
 
 proc sessionTable*()  =
-    log.logScope:
-        topics = "setup.sessionTable"
-
     withSessionDb:
         sessDb.exec(sql"""
             Create Table If Not Exists sessions (

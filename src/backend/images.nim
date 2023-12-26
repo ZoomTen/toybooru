@@ -23,8 +23,6 @@ type
 ## Get query as a sequence of ImageEntryRef, must match the column *order*
 ## of the images table.
 proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
-    log.logScope:
-        topics = "getQueried"
     result = @[]
 
     withMainDb:
@@ -74,9 +72,6 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     Where image_id Not In exclude_or
 ]#
 proc buildTagQuery*(includes: seq[string] = @[], excludes: seq[string] = @[]): string =
-    log.logScope:
-        topics = "buildTagQuery"
-
     var query: string
 
     log.debug("Query building",
@@ -138,9 +133,6 @@ proc buildPageQuery*(
         pageNum, numResults: int,
         descending: bool = false
     ): string =
-        log.logScope:
-            topics = "buildPageQuery"
-
         if query == "": # blank query
             return query
 
@@ -258,9 +250,6 @@ proc buildSearchQuery*(
     pageNum:int = 0,
     numResults:int = defaultNumResults
 ): string =
-    log.logScope:
-        topics = "buildSearchQuery"
-
     log.debug("Query input", query=query)
 
     if query.strip() == "":
@@ -304,9 +293,6 @@ proc buildSearchQuery*(
 
 # TODO: prone to SQL injection
 proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
-    log.logScope:
-        topics = "getTagAutocompletes"
-
     result = @[]
 
     try:
