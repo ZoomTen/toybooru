@@ -26,6 +26,8 @@ Database support:
 
 Configuration is hard-coded for now, look at `src/settings.nim`.
 
+Usage with SQLite requires `libsqlite3-dev` to be installed on Debian, at least.
+
 ## What's here?
 
 - Basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete)
