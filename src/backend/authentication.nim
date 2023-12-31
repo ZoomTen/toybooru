@@ -2,19 +2,22 @@
 
 import jester/request
 import std/[
-    random, times, strutils, tables, selectors,
-    options
+    random, times, strutils, selectors
 ]
 import chronicles as log
 import libsodium/[sodium, sodium_sizes]
 import ../settings
-import ./exceptions
 import ./validation
 import ../importDb
+import results
+import ../helpers/getParams
+import ../helpers/catchErrMsg
 
-export options
+export results
 export selectors
 export sodium
+
+{.push raises: [].}
 
 type
     User* = object
@@ -35,11 +38,13 @@ proc toSessId*(req: Request): string =
         return $(r.next())
 
 proc toHashed*(s: string): string =
-    result = s.cryptoGenericHash(
-        cryptoGenericHashBytes()
-    ).toHex().toLower()
+    let hashVal = catchErrMsg:
+        s.cryptoGenericHash(cryptoGenericHashBytes())
+        .toHex()
+        .toLower()
+    return hashVal.expect("hash value must exist")
 
-proc invalidateExpiredSessions*(): void =
+proc invalidateExpiredSessions*(): Result[void, string] =
     withSessionDb:
         let numDeletedSessions = sessDb.execAffectedRows(
         sql"Delete From sessions Where (expires < ? and expires != 0)",
@@ -48,33 +53,53 @@ proc invalidateExpiredSessions*(): void =
 
         if numDeletedSessions > 0:
             log.debug "Deleted expired sessions", numSessions=numDeletedSessions
+    return ok()
 
-proc getSessionIdFrom*(req: Request): string =
+proc getSessionIdFrom*(req: Request): Result[string, string] =
     # get cookie parameter from the session
-    let cookieParam = req.cookies.getOrDefault(sessionCookieName, "")
+    let cookieParam = req.getCookieOrDefault(sessionCookieName, "")
 
     withSessionDb:
-        if sessDb.getValue(sql"Select sid From sessions Where sid = ?", cookieParam) == "": # session does not exist in table
+        if sessDb.getValue(
+            sql"Select sid From sessions Where sid = ?",
+            cookieParam
+        ) == "": # session does not exist in table
             log.debug("No session cookie, generating a new one!")
+
             let newId = req.toSessId().toHashed()
             sessDb.exec(
                 sql"Insert Into sessions(sid, expires) Values (?, ?)",
                 newId,
                 $((getTime() + defaultSessionExpirationTime).toUnix())
             )
-            return newId
+
+            return newId.ok()
         else: # session exists
-            return cookieParam
+            return cookieParam.ok()
 
-proc userFromRow(user: Row): User =
+proc userFromRow(user: Row): Result[User, string] =
+    var
+        userId: int
+        joinedTimestamp: Time
+        lastLoggedTimestamp: Time
+
+    try: userId = user[0].parseInt()
+    except ValueError: return err("ID invalid")
+
+    try: joinedTimestamp = user[2].parseInt().fromUnix()
+    except ValueError: return err("Join timestamp invalid")
+
+    try: lastLoggedTimestamp = user[3].parseInt().fromUnix()
+    except ValueError: return err("Last logged in timestamp invalid")
+
     return User(
-        id: user[0].parseInt(),
+        id: userId,
         name: user[1],
-        joinedOn: user[2].parseInt().fromUnix(),
-        lastLoggedIn: user[3].parseInt().fromUnix()
-    )
+        joinedOn: joinedTimestamp,
+        lastLoggedIn: lastLoggedTimestamp
+    ).ok()
 
-proc getCurrentUser*(sessId: string): Option[User]  =
+proc getCurrentUser*(sessId: string): Result[User, string]  =
     var userId: string
 
     withSessionDb:
@@ -84,8 +109,7 @@ proc getCurrentUser*(sessId: string): Option[User]  =
         )
 
         if userId == "":
-            log.debug("No user attached to session", sessId=sessId)
-            return none(User)
+            return err("No user attached to session " & sessId)
 
     withMainDb:
         let user = mainDb.getRow(
@@ -94,84 +118,102 @@ proc getCurrentUser*(sessId: string): Option[User]  =
         )
 
         if user == @[]:
-            log.debug("User does not exist", userId=userId)
-            return none(User)
+            return err("User " & userId & "does not exist")
 
-        return some(userFromRow(user))
+        return userFromRow(user)
 
-proc setNewAcsrfToken*(sessId: string): string  =
+proc setNewAcsrfToken*(sessId: string): Result[string, string]  =
     # generate new ACSRF string
     let acsrfString = randombytes(16).toHex().toLower()
 
     withSessionDb:
-        if sessDb.getValue(sql"Select sid From session_acsrf Where sid = ?", sessId) != sessId:
+        if sessDb.getValue(
+            sql"Select sid From session_acsrf Where sid = ?",
+            sessId
+        ) != sessId:
             log.debug("Inserted a new ACSRF token", sessId=sessId, acsrfString=acsrfString)
             sessDb.exec(sql"Insert Into session_acsrf(sid, token) Values (?, ?)", sessId, acsrfString)
+
         else:
             log.debug("Updated an ACSRF token", sessId=sessId, acsrfString=acsrfString)
             sessDb.exec(sql"Update session_acsrf Set token = ? Where sid = ?", acsrfString, sessId)
-        return acsrfString
 
-proc verifyAcsrfToken*(sessId: string, acsrfToken: string): void =
+    return acsrfString.ok()
+
+proc verifyAcsrfToken*(sessId: string, acsrfToken: string): Result[void, string] =
     withSessionDb:
-        if sessDb.getValue(sql"Select 1 From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken) != "1":
-            raise newException(TokenException, "Please try again...")
+        if sessDb.getValue(
+            sql"Select 1 From session_acsrf Where sid = ? And token = ?",
+            sessId,
+            acsrfToken
+        ) != "1":
+            return err("Please try again...")
 
         # Token used
         sessDb.exec(sql"Delete From session_acsrf Where sid = ? And token = ?", sessId, acsrfToken)
+    return ok()
 
-proc processSignUp*(req: Request): tuple[user: Option[User], password: string, errors: seq[ref Exception]]  =
+proc userExists*(username: string): Result[bool, string] =
     withMainDb:
-        var errors: seq[ref Exception] = @[]
-        let
-            sessId = getSessionIdFrom(req)
-        try:
-            sessId.verifyAcsrfToken(req.params.getOrDefault(antiCsrfFieldName, ""))
-        except TokenException as e:
-            errors.add(e)
-        var
-            rqUsername = req.params.getOrDefault(usernameFieldName, "")
-        let
-            rqPassword = req.params.getOrDefault(passwordFieldName, "")
-            rqConfirmPassword = req.params.getOrDefault(confirmPasswordFieldName, "")
+        return (mainDb.getValue(
+            sql"Select 1 From users Where username = ?",
+            username
+        ) == "1").ok()
 
-        try:
-            rqUsername = rqUsername.sanitizeUsername()
-        except ValidationError:
-            errors.add(
-                newException(LoginException, "Invalid username!")
-            )
-        if rqUsername == "":
-            errors.add(
-                newException(LoginException, "Username missing!")
-            )
-        if mainDb.getValue(sql"Select 1 From users Where username = ?", rqUsername) == "1":
-            errors.add(
-                newException(LoginException, "Someone else already has that username!")
-            )
-        # add additional checks for username here
-        if rqPassword == "":
-            errors.add(
-                newException(LoginException, "Password missing!")
-            )
-        if rqConfirmPassword == "" or (rqPassword != rqConfirmPassword):
-            errors.add(
-                newException(LoginException, "Passwords do not match!")
-            )
-        let user = if errors.len() != 0:
-            none(User)
-        else:
-            some(
-                User(
-                name: rqUsername,
-                joinedOn: getTime()
-                )
-            )
-        return (user: user, password: rqPassword, errors: errors)
+proc verifySession(req: Request): Result[void, string] =
+    let sessId = ?getSessionIdFrom(req)
+    ?verifyAcsrfToken(
+        sessId,
+        req.getParamOrDefault(antiCsrfFieldName, "")
+    )
+    return ok()
 
-proc doSignUp*(user: User, pw: string): void  =
+proc processSignUp*(req: Request): Result[User, seq[string]]  =
+    var errors: seq[string] = @[]
+
+    var
+        rqUsername = req.getParamOrDefault(usernameFieldName, "")
+
+    let
+        rqPassword = req.getParamOrDefault(passwordFieldName, "")
+        rqConfirmPassword = req.getParamOrDefault(confirmPasswordFieldName, "")
+
+    block sessionValidation: # returns immediately
+        if (
+            let sessVerified = req.verifySession()
+            sessVerified.isErr
+        ):
+            errors.add(sessVerified.error())
+            return err(errors)
+
+    block usernameValidation:
+        let usernameValid = rqUsername.sanitizeUsername()
+        if usernameValid.isErr: errors.add(usernameValid.error)
+
+        rqUsername = usernameValid.value
+
+        if (
+            # can't use withMainDb here :(
+            let usernameExists = rqUsername.userExists()
+            usernameExists.isOk and usernameExists.value
+        ):
+            errors.add("Someone else already has that username!")
+
+    block passwordValidation:
+        if rqPassword == "": errors.add("Password missing!")
+        if rqConfirmPassword != rqPassword: errors.add("Passwords do not match!")
+
+    if errors.len > 0: return err(errors)
+
+    return User(name: rqUsername, joinedOn: getTime()).ok()
+
+proc doSignUp*(user: User, pw: string): Result[void, string]  =
     withMainDb:
-        let pwHashed = cryptoPwHashStr(pw)
+        var pwHashed: string
+
+        try:
+            pwHashed = cryptoPwHashStr(pw)
+        except Exception: return err("Error hashing password")
 
         log.debug("Someone has signed up", userName=user.name)
 
@@ -184,74 +226,62 @@ proc doSignUp*(user: User, pw: string): void  =
             mainDb.exec(sql"""
                 Insert Into user_blacklists(user_id) Values (?)
             """, userId)
+    return ok()
 
-proc processLogIn*(req: Request): tuple[
-    user: Option[User],
-    errors: seq[ref Exception],
-    alreadyLoggedIn: bool,
-    dontAutoLogOut: bool
-] =
+proc processLogIn*(req: Request): Result[tuple[user: User, dontAutoLogOut: bool], string] =
     const genericUnameOrPwInvalidMsg = "Username or password invalid"
-
-    let existingUser = getSessionIdFrom(req).getCurrentUser()
-    if existingUser.isSome():
-        log.debug("User already logged in", user=existingUser.get().name)
-        # skip the login process
-        return (
-            user: existingUser,
-            errors: @[],
-            alreadyLoggedIn: true,
-            dontAutoLogOut: true
-        )
-
-    var errors: seq[ref Exception] = @[]
-    let
-        sessId = getSessionIdFrom(req)
-    try:
-        sessId.verifyAcsrfToken(req.params.getOrDefault(antiCsrfFieldName, ""))
-    except TokenException as e:
-        errors.add(e)
-
     var
-        uname = req.params.getOrDefault(usernameFieldName, "")
-        pw = req.params.getOrDefault(passwordFieldName, "")
-        remember = req.params.getOrDefault(rememberFieldName, "")
+        rqUsername = req.getParamOrDefault(usernameFieldName, "")
+        rqPassword = req.getParamOrDefault(passwordFieldName, "")
+        rqRemember = req.getParamOrDefault(rememberFieldName, "")
+        userData: Row
 
-    withMainDb:
-        let userData = mainDb.getRow(
-            sql"Select id, username, joined_on, logged_in, password From users Where username = ?",
-            uname
+    # TODO: handle "user logged in" in caller for processLogin
+
+    block sessionValidation: # returns immediately
+        if (
+            let sessVerified = req.verifySession()
+            sessVerified.isErr
+        ):
+            log.debug("Session verification error", error=sessVerified.error())
+            return err(genericUnameOrPwInvalidMsg)
+
+    block userValidation:
+        let usernameValid = rqUsername.sanitizeUsername()
+        if usernameValid.isErr:
+            log.debug("Username validation error", error=usernameValid.error())
+            return err(genericUnameOrPwInvalidMsg)
+
+        rqUsername = usernameValid.value
+
+        let usernameExists = rqUsername.userExists()
+
+        if usernameExists.isErr:
+            log.debug("Username validation error", error=usernameExists.error())
+            return err(genericUnameOrPwInvalidMsg)
+
+        if not usernameExists.value:
+            log.debug("User does not exist", name=rqUsername)
+            return err(genericUnameOrPwInvalidMsg)
+
+    block passwordValidation:
+        withMainDb:
+            userData = mainDb.getRow(
+                sql"Select id, username, joined_on, logged_in, password From users Where username = ?",
+                rqUsername
+            )
+            if not cryptoPwHashStrVerify(userData[4], rqPassword):
+                log.debug("Password incorrect", name=rqUsername)
+                return err(genericUnameOrPwInvalidMsg)
+
+    return ok(
+        (
+            user: ?userFromRow(userData),
+            dontAutoLogOut: rqRemember.strip() != ""
         )
+    )
 
-        block validate:
-            try:
-                uname = uname.sanitizeUsername()
-            except ValidationError:
-                log.debug("Invalid username", name=uname)
-                errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
-                break validate
-            if userData[0] == "":
-                log.debug("Username not found", name=uname)
-                errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
-            else:
-                # user in db
-                if not cryptoPwHashStrVerify(userData[4], pw):
-                    log.debug("Password incorrect", name=uname)
-                    errors.add(newException(LoginException, genericUnameOrPwInvalidMsg))
-
-        let user = if errors.len() == 0:
-            some(userFromRow(userData))
-        else:
-            none(User)
-
-        return (
-            user: user,
-            errors: errors,
-            alreadyLoggedIn: false,
-            dontAutoLogOut: (remember.strip() != "")
-        )
-
-proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool): void =
+proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool): Result[void, string] =
     withSessionDb:
         # check if session is valid
         if sessDb.getValue(
@@ -273,16 +303,15 @@ proc doLogIn*(sessId: string, user: User, dontAutoLogOut: bool): void =
             )
             log.debug("Requested persistent session", sessId=sessId, userName=user.name)
 
-        withMainDb:
-            mainDb.exec(
-                sql"Update users Set logged_in = ? Where id = ?",
-                getTime().toUnix(),
-                user.id
-            )
+    withMainDb:
+        mainDb.exec(
+            sql"Update users Set logged_in = ? Where id = ?",
+            getTime().toUnix(),
+            user.id
+        )
 
-proc logOut*(sessId: string): void =
+proc logOut*(sessId: string): Result[void, string] =
     ## Simply deletes the session, as that'll delete everything under it too
     withSessionDb:
         log.debug("A user logged out", sessId=sessId)
-
         sessDb.exec(sql"""Delete From sessions Where sid = ?""", sessId)

@@ -3,7 +3,6 @@ import std/[
     strutils, sugar
 ]
 import ./validation as validate
-import ./exceptions
 import ../importDb
 
 when not defined(usePostgres):
@@ -20,10 +19,12 @@ type
         tag: string
         count: int
 
+{.push raises: [].}
+
 ## Get query as a sequence of ImageEntryRef, must match the column *order*
 ## of the images table.
-proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
-    result = @[]
+proc getQueried*(query: string, args: varargs[string]): Result[seq[ImageEntryRef], string] =
+    var retval: seq[ImageEntryRef] = @[]
 
     withMainDb:
         when not defined(usePostgres):
@@ -33,20 +34,24 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
         log.debug("Get query as images", query=query)
 
         if query.strip() == "":
-            return result
+            return retval.ok()
 
         for row in mainDb.instantRows(query.sql(), args):
-            result.add(
-                ImageEntryRef(
-                    id: row[0].parseInt(),
-                    hash: row[1],
-                    formatMime: row[2],
-                    dimensions: (
-                        row[3].parseInt(),
-                        row[4].parseInt()
+            try:
+                retval.add(
+                    ImageEntryRef(
+                        id: row[0].parseInt(),
+                        hash: row[1],
+                        formatMime: row[2],
+                        dimensions: (
+                            row[3].parseInt(),
+                            row[4].parseInt()
+                        )
                     )
                 )
-            )
+            except ValueError as e:
+                return err(e.msg)
+    return retval.ok()
 
 ## Int is for ImageEntryRef id's
 #[
@@ -71,7 +76,7 @@ proc getQueried*(query: string, args: varargs[string]): seq[ImageEntryRef] =
     Inner Join images On image_id = images.id
     Where image_id Not In exclude_or
 ]#
-proc buildTagQuery*(includes: seq[string] = @[], excludes: seq[string] = @[]): string =
+proc buildTagQuery*(includes: seq[string] = @[], excludes: seq[string] = @[]): string {.raises:[ValueError].} =
     var query: string
 
     log.debug("Query building",
@@ -154,9 +159,9 @@ proc buildPageQuery*(
             descending=descending
         )
 
-proc getCountOfQuery*(query: string): int  =
+proc getCountOfQuery*(query: string): Result[int, string] =
     if query == "":
-        return 0
+        return 0.ok()
 
     withMainDb:
         when not defined(usePostgres):
@@ -165,29 +170,40 @@ proc getCountOfQuery*(query: string): int  =
 
         var cxquery = "With root_query As ( " & query & " ) "
         cxquery &= "Select Count(*) From root_query"
-        return mainDb.getValue(cxquery.sql()).parseInt()
 
-proc getMostPopularTagsGeneral*(numberOfTags: int = 10): seq[TagTuple]  =
-    result = @[]
+        try:
+            return mainDb.getValue(cxquery.sql()).parseInt().ok()
+        except ValueError as e:
+            return err(e.msg)
+
+proc getMostPopularTagsGeneral*(numberOfTags: int = 10): Result[seq[TagTuple], string]  =
+    var retval: seq[TagTuple] = @[]
 
     withMainDb:
         for row in mainDb.instantRows(
             sql"Select tag, count From tags Order By count Desc Limit ?",
             numberOfTags
         ):
-            result.add(
-                (tag: row[0], count: row[1].parseInt())
-            )
+            try:
+                retval.add(
+                    (tag: row[0], count: row[1].parseInt())
+                )
+            except ValueError as e:
+                return err(e.msg)
+    return retval.ok()
 
-proc getRandomIdFrom*(query: string): int  =
+proc getRandomIdFrom*(query: string): Result[int, string] =
     var cxquery = "With root_query As ( " & query & " ) "
     cxquery &= "Select id From root_query Order By Random() Limit 1"
 
     withMainDb:
-        return mainDb.getValue(cxquery.sql()).parseInt()
+        try:
+            return mainDb.getValue(cxquery.sql()).parseInt().ok()
+        except ValueError as e:
+            return err(e.msg)
 
-proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
-    result = @[]
+proc getTagsFor*(image: ImageEntryRef): Result[seq[TagTuple], string] =
+    var retval: seq[TagTuple] = @[]
 
     withMainDb:
         for row in mainDb.instantRows(
@@ -197,15 +213,20 @@ proc getTagsFor*(image: ImageEntryRef): seq[TagTuple]  =
                 Where image_tags.image_id = ?
             """, $image.id
         ):
-            result.add(
-                (tag: row[0], count: row[1].parseInt())
-            )
+            try:
+                retval.add(
+                    (tag: row[0], count: row[1].parseInt())
+                )
+            except ValueError as e:
+                return err(e.msg)
+    
+    return retval.ok()
 
-proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): seq[TagTuple] =
-    result = @[]
+proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): Result[seq[TagTuple], string] =
+    var retval: seq[TagTuple] = @[]
     
     if images.len == 0:
-        return result
+        return retval.ok()
     
     # build query
     var query = """
@@ -224,20 +245,30 @@ proc getTagsForMultiple*(images: seq[ImageEntryRef], sorted: bool = true): seq[T
     #execute it
     withMainDb:
         for row in mainDb.instantRows(query.sql):
-            result.add(
-                (tag: row[0], count: row[1].parseInt())
-            )
+            try:
+                retval.add(
+                    (tag: row[0], count: row[1].parseInt())
+                )
+            except ValueError as e:
+                return err(e.msg)
+    
+    return retval.ok()
 
-proc getAllTags*(): seq[TagTuple]  =
-    result = @[]
+proc getAllTags*(): Result[seq[TagTuple], string]  =
+    var retval: seq[TagTuple] = @[]
 
     withMainDb:
         for row in mainDb.instantRows(
             sql"Select tag, count From tags Order By tag Asc"
         ):
-            result.add(
-                (tag: row[0], count: row[1].parseInt())
-            )
+            try:
+                retval.add(
+                    (tag: row[0], count: row[1].parseInt())
+                )
+            except ValueError as e:
+                return err(e.msg)
+    
+    return retval.ok()
 
 proc tagsAsString*(tags: seq[TagTuple]): string =
     var st: seq[string]
@@ -249,7 +280,7 @@ proc buildSearchQuery*(
     query: string = "",
     pageNum:int = 0,
     numResults:int = defaultNumResults
-): string =
+): string {.raises:[ValueError].} =
     log.debug("Query input", query=query)
 
     if query.strip() == "":
@@ -265,20 +296,23 @@ proc buildSearchQuery*(
         if queryElement == "": continue
         if queryElement[0] == '-':
             queryElement = queryElement.substr(1)
-            try:
-                queryElement = validate.sanitizeKeyword(queryElement)
-            except ValidationError:
+
+            let queryValid = validate.sanitizeKeyword(queryElement)
+            if queryValid.isErr:
                 log.debug("Keyword invalid", keyword=queryElement)
                 continue
+
+            queryElement = queryValid.value
 
             log.debug("Negating keyword", keyword=queryElement)
             excludes.add(queryElement)
         else:
-            try:
-                queryElement = validate.sanitizeKeyword(queryElement)
-            except ValidationError:
+            let queryValid = validate.sanitizeKeyword(queryElement)
+            if queryValid.isErr:
                 log.debug("Keyword invalid", keyword=queryElement)
                 continue
+
+            queryElement = queryValid.value
 
             log.debug("Adding keyword", keyword=queryElement)
             includes.add(queryElement)
@@ -292,23 +326,25 @@ proc buildSearchQuery*(
     return images.buildTagQuery(includes=includes, excludes=excludes)
 
 # TODO: prone to SQL injection
-proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
-    result = @[]
+proc getTagAutocompletes*(keyword: string): Result[seq[TagTuple], string]  =
+    var retval: seq[TagTuple] = @[]
 
-    try:
-        let kw = validate.sanitizeKeyword(keyword)
-        # need keyword sanitization
+    let kw = validate.sanitizeKeyword(keyword)
+    if kw.isErr:
+        log.debug("Keyword invalid", keyword=keyword)
+        return retval.ok()
 
-        withMainDb:
-            for row in mainDb.instantRows(
-                sql("Select tag, count From tags Where tag Like \"%" & kw & "%\" Order By tag Asc")
-            ):
-                result.add(
+    withMainDb:
+        for row in mainDb.instantRows(
+            sql("Select tag, count From tags Where tag Like \"%" & kw.value & "%\" Order By tag Asc")
+        ):
+            try:
+                retval.add(
                     (tag: row[0], count: row[1].parseInt())
                 )
-    except ValidationError:
-        log.debug("Keyword invalid", keyword=keyword)
-        return result
+            except ValueError:
+                continue
+    return retval.ok()
 
 proc buildImageSimilarityQuery*(image: ImageEntryRef, maxDistance: int = 64): string =
     when defined(usePostgres):

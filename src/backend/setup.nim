@@ -4,14 +4,16 @@ import ../importDb
 
 import chronicles as log
 
-proc folders*() =
+{.push raises:[].}
+
+proc folders*() {.raises:[IOError, OSError].} =
     log.info("Created image folder")
     createDir(imgDir)
 
     log.info("Created thumbnail folder")
     createDir(thumbDir)
 
-proc imageTable*() =
+proc imageTable*(): Result[void, string] =
     withMainDb:
         when defined(usePostgres):
             mainDb.exec(sql"""
@@ -34,8 +36,9 @@ proc imageTable*() =
             )
             """)
         log.info("Initialized image table")
+    return ok()
 
-proc tagTable*() =
+proc tagTable*(): Result[void, string] =
     withMainDb:
         when defined(usePostgres):
             mainDb.exec(sql"""
@@ -65,8 +68,9 @@ proc tagTable*() =
         )
         """)
         log.info("Initialized image/tag relation table")
+    return ok()
 
-proc userTable*()  =
+proc userTable*(): Result[void, string]  =
     # create table of users
     withMainDb:
         when defined(usePostgres):
@@ -91,8 +95,9 @@ proc userTable*()  =
             """)
 
         log.info("Initialized users table")
+    return ok()
 
-proc userBlacklistsTable*()  =
+proc userBlacklistsTable*(): Result[void, string]  =
     withMainDb:
         mainDb.exec(sql"""
             Create Table If Not Exists user_blacklists (
@@ -102,8 +107,9 @@ proc userBlacklistsTable*()  =
             )
         """, defaultBlacklist)
         log.info("Initialized user blacklists table")
+    return ok()
 
-proc imagePhashesTable*()  =
+proc imagePhashesTable*(): Result[void, string]  =
     withMainDb:
         mainDb.exec(sql"""
             Create Table If Not Exists image_phashes (
@@ -113,8 +119,9 @@ proc imagePhashesTable*()  =
             )
         """)
         log.info("Initialized image perceptual hashes table")
+    return ok()
 
-proc sessionTable*()  =
+proc sessionTable*(): Result[void, string]  =
     withSessionDb:
         sessDb.exec(sql"""
             Create Table If Not Exists sessions (
@@ -145,3 +152,4 @@ proc sessionTable*()  =
             )
         """)
         log.info("Initialized session anti-CSRF table")
+    return ok()

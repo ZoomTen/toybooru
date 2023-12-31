@@ -3,7 +3,6 @@ import stb_image/read as stbr
 import stb_image/write as stbw
 import ../stb/resize as stbz
 import ../settings
-import ./exceptions
 import ./validation as validate
 import chronicles as log
 
@@ -17,6 +16,11 @@ else:
     import std/md5
 
 import ./pHashes as phash
+
+import results
+export results
+
+{.push raises:[].}
 
 type
     FileUploadRef* = ref object
@@ -35,16 +39,24 @@ proc newFileUploadRef*(contents: string, length: int, filename, mime: string): F
 
 proc fileFromReq*(
     req: tuple[fields: StringTableRef, body: string]
-): FileUploadRef  =
-    result = newFileUploadRef(
-        req.body, req.body.len(), req.fields["filename"], req.fields["Content-Type"]
-    )
+): Result[FileUploadRef, string]  =
+    try:
+        return newFileUploadRef(
+            req.body, req.body.len(), req.fields["filename"], req.fields["Content-Type"]
+        ).ok()
+    except KeyError:
+        if not req.fields.hasKey("filename"):
+            return err("Missing filename argument")
+        if not req.fields.hasKey("Content-Type"):
+            return err("Missing content type")
+        return err("Something's missing, but I don't know what!")
 
-proc clearTags*(imageId: int)  =
+proc clearTags*(imageId: int): Result[void, string]  =
     withMainDb:
         mainDb.exec(sql"Delete From image_tags Where image_id = ?", imageId)
+    return ok()
 
-proc refreshTagCounts*()  =
+proc refreshTagCounts*(): Result[void, string]  =
     withMainDb:
         mainDb.exec(sql"""
         Update tags Set count = tag_count.count From (
@@ -53,33 +65,25 @@ proc refreshTagCounts*()  =
         Where tags.id = tag_count.tag_id
         """)
         log.debug("Refresh all tag counts")
+    return ok()
 
-proc assignTags*(imageId: int, t: string)  =
-    var tags = ""
+proc assignTags*(imageId: int, t: string): Result[void, string]  =
+    var tags = ?validate.normalizeSpaces(t.strip())
 
-    try:
-        tags = validate.normalizeSpaces(t.strip())
-    except ValueError:
-        return
-
-    if tags == "": return
+    if tags == "": return ok()
 
     # verify image exists
     withMainDb:
         if mainDb.getValue(sql"Select 1 From images Where id = ?", imageId) == "":
-            raise newException(BooruException, "Image " & $imageId & " doesn't exist!")
+            return err("Image " & $imageId & "doesn't exist!")
 
         var tag = ""
 
         for rawTag in tags.split(" ").deduplicate():
             if rawTag == "": continue
             if rawTag[0] == '-':
-                raise newException(BooruException, "Tag " & rawTag & " cannot start with a minus!")
-
-            try:
-                tag = sanitizeKeyword(rawTag)
-            except ValidationError as e:
-                raise newException(BooruException, e.msg)
+                return err("Tag " & rawTag & "cannot start with a minus!")
+            tag = ?sanitizeKeyword(rawTag)
 
             var tagRowId: int64
             try: # does tag exist?
@@ -91,7 +95,7 @@ proc assignTags*(imageId: int, t: string)  =
                     Insert Into tags ("tag") Values (?)
                 """, tag.strip())
                 if tagRowId == -1:
-                    raise newException(BooruException, "Failed inserting tag " & tag & " into db!")
+                    return err("Failed inserting tag " & tag & " into db!")
 
             # add tag to image
             mainDb.exec(sql"""
@@ -99,7 +103,7 @@ proc assignTags*(imageId: int, t: string)  =
             """, imageId, tagRowId)
 
     log.info("Assigned tags to image", imgId=imageId, tags=t)
-    refreshTagCounts()
+    return refreshTagCounts()
 
 proc genThumbSize(width, height: int): array[0..1, int] =
     result = [thumbSize, thumbSize]
@@ -108,7 +112,7 @@ proc genThumbSize(width, height: int): array[0..1, int] =
     else: # if tall
         result[0] = int(thumbSize.float() * (width/height))
 
-proc processFile*(file: FileUploadRef, tags: string) =
+proc processFile*(file: FileUploadRef, tags: string): Result[void, string] =
     # TODO: transactionize this; image analysis is done first, try insert to table and only after it's successful, will the files be uploaded (?)
     
     let mimeMappings = makeMimeMappings()
@@ -121,12 +125,12 @@ proc processFile*(file: FileUploadRef, tags: string) =
     try:
         extension = mimeMappings[file.mime]
     except KeyError:
-        raise newException(BooruException, "Unsupported file format! Supported formats are jpeg, png, mp4.")
+        return err("Unsupported file format! Supported formats are jpeg, png, mp4.")
 
     withMainDb:
         let hashExists = mainDb.getValue(sql"Select id From images Where hash = ?", hash)
         if hashExists != "":
-            raise newException(BooruException, "An image with this hash already exists: " & hashExists)
+            return err("An image with this hash already exists: " & hashExists)
 
     var
         width = 0
@@ -136,53 +140,81 @@ proc processFile*(file: FileUploadRef, tags: string) =
         let
             exportName = imgDir & "/" & hash & "." & extension
             thumbName = thumbDir & "/" & hash & ".jpg"
+
         # copy uploaded file
-        writeFile(
-            exportName,
-            file.contents
-        )
-        exportName.inclFilePermissions({fpGroupRead, fpOthersRead})
+        try:
+            writeFile(exportName, file.contents)
+        except IOError as e:
+            return err("Can't copy file, " & e.msg)
+
+        try:
+            exportName.inclFilePermissions({fpGroupRead, fpOthersRead})
+        except OSError as e:
+            return err("Setting perms for copied file failed, " & e.msg)
+
         # make thumbnail
         if extension in ["mp4"]:
-            let
-                ffprobe = findExe("ffprobe")
-                ffmpeg = findExe("ffmpeg")
-            if ffprobe == "" or ffmpeg == "":
-                raise newException(BooruException, "This server doesn't support video files :(")
-            # https://stackoverflow.com/a/29585066
-            var (wh, ex) = execCmdEx(
-                ffprobe & " -v quiet -select_streams v -show_entries stream=width,height -of csv=p=0:s=x " & exportName
-            )
-            if ex != 0:
-                raise newException(BooruException, "Error processing video!")
-            let
-                whx = wh.split("x")
-                width = whx[0].strip().parseInt()
-                height = whx[1].strip().parseInt()
-                genThumbSize = genThumbSize(width, height)
+            try:
+                let
+                    ffprobe = findExe("ffprobe")
+                    ffmpeg = findExe("ffmpeg")
 
-            (wh, ex) = execCmdEx(
-                ffmpeg & " -i " & exportName & " -ss 0 -vframes 1 -s " &
-                $genThumbSize[0] & "x" & $genThumbSize[1] & " -y " & thumbName
-            )
+                if ffprobe == "" or ffmpeg == "":
+                    return err("This server doesn't support video files :(")
+
+                # https://stackoverflow.com/a/29585066
+                var (wh, ex) = execCmdEx(
+                    ffprobe & " -v quiet -select_streams v -show_entries stream=width,height -of csv=p=0:s=x " & exportName
+                )
+                if ex != 0:
+                    return err("Error processing video")
+                let
+                    whx = wh.split("x")
+                    width = whx[0].strip().parseInt()
+                    height = whx[1].strip().parseInt()
+                    genThumbSize = genThumbSize(width, height)
+
+                (wh, ex) = execCmdEx(
+                    ffmpeg & " -i " & exportName & " -ss 0 -vframes 1 -s " &
+                    $genThumbSize[0] & "x" & $genThumbSize[1] & " -y " & thumbName
+                )
+            except OSError as e:
+                return err(e.msg)
+            except IOError as e:
+                return err(e.msg)
+            except ValueError as e:
+                return err(e.msg)
 
         else:
             var
                 channels: int
                 imgData, imgThumb: seq[uint8]
 
-            imgData = stbr.loadFromMemory(
-                cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
-            )
+            try:
+                imgData = stbr.loadFromMemory(
+                    cast[seq[uint8]](file.contents), width, height, channels, stbr.Default
+                )
 
-            # calculate thumbsize
-            let genThumbSize = genThumbSize(width, height)
+                # calculate thumbsize
+                let genThumbSize = genThumbSize(width, height)
 
-            imgThumb = stbz.resize(
-                imgData, width, height, genThumbSize[0], genThumbSize[1], channels
-            )
-            stbw.writeJPG(thumbName, genThumbSize[0], genThumbSize[1], channels, imgThumb, 30)
-        thumbName.inclFilePermissions({fpGroupRead, fpOthersRead})
+                imgThumb = stbz.resize(
+                    imgData, width, height, genThumbSize[0], genThumbSize[1], channels
+                )
+
+                stbw.writeJPG(
+                    thumbName,
+                    genThumbSize[0], genThumbSize[1],
+                    channels, imgThumb,
+                    30
+                )
+            except STBIException as e:
+                return err(e.msg)
+
+        try:
+            thumbName.inclFilePermissions({fpGroupRead, fpOthersRead})
+        except OSError as e:
+            return err(e.msg)
 
         # add new image
         withMainDb:
@@ -191,32 +223,41 @@ proc processFile*(file: FileUploadRef, tags: string) =
             """, hash, file.mime, width, height)
 
             if imageId == -1:
-                raise newException(BooruException, "Failed inserting image into db!")
+                return err("Failed inserting image into db!")
 
             if not (extension in ["mp4"]):
-                let pHash = phash.pHash(file.contents)
+                let pHash = ?phash.pHash(file.contents)
                 mainDb.exec(sql"Insert Into image_phashes(image_id, phash) Values (?, ?)", imageId, pHash)
                 log.info("Assigned hash to new image", imgId=imageId, hash=pHash)
 
     log.info("Added new image", imgId=imageId)
-    imageId.int.assignTags(tags)
+    return imageId.int.assignTags(tags)
 
-proc deleteImage*(imageId: int)  =
+proc deleteImage*(imageId: int): Result[void, string]  =
     let mimeMappings = makeMimeMappings()
 
     withMainDb:
         let row = mainDb.getRow(sql"Select hash, format From images Where id = ?", $imageId)
         if row != @[]:
             # delete the file first
-            let
-                hash = row[0]
-                extension = mimeMappings[row[1]]
-            removeFile(imgDir & "/" & hash & "." & extension) # exportName
-            removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
+            try:
+                let
+                    hash = row[0]
+                    extension = mimeMappings[row[1]]
+
+                removeFile(imgDir & "/" & hash & "." & extension) # exportName
+                removeFile(thumbDir & "/" & hash & ".jpg") # thumbName
+            except OSError as e:
+                return err(e.msg)
+            except KeyError as e:
+                return err(e.msg)
+
             # then delete it from the db
             mainDb.exec(sql"Delete From image_tags Where image_id = ?", $imageId)
             mainDb.exec(sql"Delete From image_phashes Where image_id = ?", $imageId)
             mainDb.exec(sql"Delete From images Where id = ?", $imageId)
             log.info("Image deleted", imgId=imageId)
         else:
-            raise newException(BooruException, "Invalid image")
+            return err("Invalid image")
+
+    return ok()
