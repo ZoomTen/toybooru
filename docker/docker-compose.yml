@@ -8,11 +8,12 @@ services:
   service:
     image: toybooru
     build:
-      context: .
-      dockerfile: ./Dockerfile
+      context: ..
+      dockerfile: ./docker/Dockerfile
     volumes:
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
-      - ./.nimble:/root/.nimble
+      - tbimg:/app/public/images
+      - tbthumb:/app/public/thumbs
     restart: always
     ports:
       - "8000:5000"
@@ -26,12 +27,15 @@ services:
     image: postgres:16.2
     restart: always
     volumes:
-      - ./postgres_setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - ../postgres_setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - pgdata:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=mysecretpassword
     networks:
       - toybooru
   
   
-        #volumes:
-
+volumes:
+  pgdata:
+  tbimg:
+  tbthumb:

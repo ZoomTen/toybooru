@@ -14,17 +14,24 @@ const
     imgDir* = pubDir & imgSuffix
     thumbDir* = pubDir & thumbSuffix
 
+const
+    serverListenAddr* = "0.0.0.0"
+
+const
+    dbPort* = 5432
+    dbHost* = "database"
+
 when defined(usePostgres):
     const
         mainDbUrl* = ""
         mainDbUser* = ""
         mainDbPass* = ""
-        mainDbDatabase* = "host=localhost port=5432 user=toybooru password=toybooru dbname=toybooru_main"
+        mainDbDatabase* = "host=" & dbHost & " port=" & $dbPort & " user=toybooru password=toybooru dbname=toybooru_main"
     
         sessionDbUrl* = ""
         sessionDbUser* = ""
         sessionDbPass* = ""
-        sessionDbDatabase* = "host=localhost port=5432 user=toybooru password=toybooru dbname=toybooru_session"
+        sessionDbDatabase* = "host=" & dbHost & " port=" & $dbPort & " user=toybooru password=toybooru dbname=toybooru_session"
 else:
     const
     # db files also relative to source dir

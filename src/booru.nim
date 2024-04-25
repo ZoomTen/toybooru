@@ -256,7 +256,7 @@ proc serverMain() =
     var jester = initJester(
         mainRouter,
         settings=newSettings(
-            bindAddr="127.0.0.1", staticDir=pubDir
+            bindAddr=serverListenAddr, staticDir=pubDir
         )
     )
     jester.serve()
