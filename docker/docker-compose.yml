@@ -16,7 +16,7 @@ services:
       - tbthumb:/app/public/thumbs
     restart: always
     ports:
-      - "8000:5000"
+      - "${PORT:-8000}:5000"
     networks:
       - toybooru
     depends_on:
