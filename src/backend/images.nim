@@ -301,7 +301,7 @@ proc getTagAutocompletes*(keyword: string): seq[TagTuple]  =
 
         withMainDb:
             for row in mainDb.instantRows(
-                sql("Select tag, count From tags Where tag Like \"%" & kw & "%\" Order By tag Asc")
+                sql("Select tag, count From tags Where tag Like '%" & kw & "%' Order By tag Asc")
             ):
                 result.add(
                     (tag: row[0], count: row[1].parseInt())
