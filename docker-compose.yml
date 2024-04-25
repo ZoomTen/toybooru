@@ -1,0 +1,37 @@
+version: "3.9"
+
+networks:
+  toybooru:
+
+services:
+  # main application frontend
+  service:
+    image: toybooru
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - ./.nimble:/root/.nimble
+    restart: always
+    ports:
+      - "8000:5000"
+    networks:
+      - toybooru
+    depends_on:
+      - database
+  # using postgres, because i don't want to
+  # recompile sqlite
+  database:
+    image: postgres:16.2
+    restart: always
+    volumes:
+      - ./postgres_setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+    networks:
+      - toybooru
+  
+  
+        #volumes:
+
