@@ -9,5 +9,4 @@ RUN nimble -y -d:chronicles_disabled_topics:\"stdlib\" -d:chronicles_line_number
 VOLUME /app/public/images
 VOLUME /app/public/thumbs
 
-#RUN mkdir _temp_
 ENTRYPOINT ["/app/booru"]
