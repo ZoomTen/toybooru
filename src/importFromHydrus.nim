@@ -12,6 +12,7 @@ when isMainModule:
         if dirExists(args[0]):
             setup.folders()
             setup.imageTable()
+            setup.imagePhashesTable()
             setup.tagTable()
             for file in walkDir(args[0]):
                 var (dir, name, ext) = splitFile(file.path)

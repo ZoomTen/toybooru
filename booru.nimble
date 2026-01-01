@@ -24,9 +24,9 @@ requires [
     "regex#199e696"
 ]
 
-if NimMajor > 1:
+when NimMajor > 1:
     requires "db_connector#e656937"
-    requires "checksums#025bcca"
+    requires "checksums >= 0.2.1"
 
 # Debug dependencies
 
